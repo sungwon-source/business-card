@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>명함 신청 관리자 페이지</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f7f6; }
+        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 1200px; margin: auto; margin-bottom: 20px; transition: 0.3s; }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        #loginScreen { text-align: center; margin-top: 100px; }
+        #loginScreen input { padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        #loginScreen button { padding: 10px 20px; font-size: 16px; background-color: #333; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #adminScreen { display: none; }
+        
+        .setting-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #f39c12; }
+        .setting-box label { font-weight: bold; margin-right: 5px; }
+        .setting-box input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-right: 15px; }
+        
+        .btn-save { background-color: #f39c12; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-cancel { background-color: #dc3545; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        
+        /* 💡 현재 설정 기간 소형 텍스트 스타일 */
+        .current-info-text { font-size: 0.85em; color: #555; margin-left: 12px; display: none; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd; }
+
+        .filter-box { background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .filter-box label { font-weight: bold; }
+        .filter-box select { padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background-color: white; height: 40px; box-sizing: border-box; }
+        
+        .btn-excel { background-color: #217346; color: white; padding: 0 20px; height: 40px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-sizing: border-box; display: inline-flex; align-items: center; }
+        .btn-excel:hover { background-color: #1e6b40; }
+        .btn-refresh { padding: 0 15px; height: 40px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background-color: white; cursor: pointer; box-sizing: border-box; display: inline-flex; align-items: center; }
+        .btn-refresh:hover { background-color: #f0f0f0; }
+        
+        .btn-delete-data { background-color: #c0392b; color: white; padding: 0 15px; height: 40px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-sizing: border-box; display: none; align-items: center; }
+        .btn-delete-data:hover { background-color: #962d22; }
+
+        .trash-box { background-color: #fce4d6; padding: 0; border-radius: 8px; margin-top: 40px; border-left: 4px solid #c0392b; overflow: hidden; }
+        .trash-box.collapsed { background-color: #f5f5f5; border-left: 4px solid #aaa; opacity: 0.7; }
+        .trash-box.collapsed:hover { opacity: 1; background-color: #eaeaea; }
+        
+        .trash-header { padding: 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+        .trash-header:hover { background-color: rgba(0,0,0,0.03); }
+        .trash-content-wrap { padding: 0 20px 20px 20px; display: none; }
+        
+        .btn-trash-action { padding: 5px 10px; font-size: 12px; cursor: pointer; margin-right: 5px; border-radius: 3px; border: 1px solid #ccc; background: white; }
+        .btn-clear-trash { background-color: #c0392b; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; float: right; margin-bottom: 10px; }
+
+        .table-wrapper { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 12px 10px; white-space: nowrap; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <h2>관리자 접속</h2>
+    <input type="password" id="adminPwd" placeholder="비밀번호">
+    <button id="loginBtn" onclick="checkPassword()">확인</button>
+</div>
+
+<div id="adminScreen">
+    <div class="container setting-box">
+        <h3 style="margin-top: 0; color: #d68910;">📅 새로운 명함 신청 열기 (차수/기간 설정)</h3>
+        <label>신청 차수명:</label><input type="text" id="periodName" placeholder="예: 26년 6월 신청" style="width: 150px;">
+        <label>시작일:</label><input type="date" id="startDate">
+        <label>종료일:</label><input type="date" id="endDate">
+        <button class="btn-save" onclick="savePeriod()">이 기간으로 열기</button>
+        <button class="btn-cancel" onclick="cancelPeriod()">기간 취소(마감)하기</button>
+        
+        <span id="currentPeriodInfo" class="current-info-text"></span>
+    </div>
+
+    <div class="container">
+        <h2>명함 신청 내역</h2>
+        
+        <div class="filter-box">
+            <label>조회:</label>
+            <select id="periodFilter" onchange="applyFiltersAndSort()"></select>
+            
+            <label style="margin-left: 10px;">정렬 방식:</label>
+            <select id="sortOption" onchange="applyFiltersAndSort()">
+                <option value="time">최신순</option>
+                <option value="branch">본부명</option>
+                <option value="cardType">명함종류</option>
+            </select>
+
+            <button id="deletePeriodBtn" class="btn-delete-data" onclick="trashSelectedPeriodData()">이 차수 데이터 삭제</button>
+
+            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+                <button class="btn-excel" onclick="downloadExcel()">엑셀 다운로드</button>
+                <button class="btn-refresh" onclick="fetchData()">새로고침</button>
+            </div>
+        </div>
+
+        <p id="loadingMsg" style="color: blue;">데이터를 불러오는 중입니다...</p>
+        
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>신청 차수</th><th>신청일시</th><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>주소</th><th>TEL</th><th>Mobile</th><th>수량</th></tr></thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="container trash-box collapsed" id="trashContainer">
+        <div class="trash-header" onclick="toggleTrash(event)">
+            <h3 id="trashTitle" style="margin: 0; color: #888;">🗑️ 휴지통</h3>
+            <span id="trashToggleIcon" style="color: #888; font-size: 1.2em;">▼</span>
+        </div>
+        
+        <div id="trashContent" class="trash-content-wrap">
+            <p style="font-size: 0.85em; color: #666; margin-top: 0; margin-bottom: 5px;">* 휴지통에 버려진 차수는 신청자 화면과 조회 목록에서 숨겨지며, 30일이 지나면 자동 영구 삭제됩니다.</p>
+            <button class="btn-clear-trash" onclick="clearTrashEntirely()">휴지통 비우기</button>
+            <div style="clear:both;"></div>
+            <div class="table-wrapper">
+                <table style="background: #fff;">
+                    <thead style="background: #f5f5f5;">
+                        <tr><th>삭제된 차수명</th><th>삭제 처리일시</th><th>포함된 데이터 수</th><th>관리</th></tr>
+                    </thead>
+                    <tbody id="trashBody">
+                        <tr><td colspan="4" style="color:#999; padding:15px;">휴지통이 비어 있습니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAE9nrPC2aA2wzd-hmIwkPnyq1ox4JGtOo",
+      authDomain: "businesscard-app-84975.firebaseapp.com",
+      projectId: "businesscard-app-84975",
+      storageBucket: "businesscard-app-84975.firebasestorage.app",
+      messagingSenderId: "819439880082",
+      appId: "1:819439880082:web:f4a94905a3aeb8f337234b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let allFetchedData = [];
+    let trashGroupedData = {};
+    let filteredDataForExcel = [];
+    let currentActivePeriod = "";
+    let periodMaxTimeMap = {};
+
+    window.onload = function() {
+        document.getElementById("adminPwd").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                document.getElementById("loginBtn").click();
+            }
+        });
+        if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
+            showAdminScreen();
+        }
+    };
+
+    window.checkPassword = function() {
+        if (document.getElementById('adminPwd').value === "1234") {
+            sessionStorage.setItem("isAdminLoggedIn", "true");
+            showAdminScreen();
+        } else { alert("비밀번호가 틀렸습니다."); }
+    }
+
+    function showAdminScreen() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminScreen').style.display = 'block';
+        loadPeriod(); 
+    }
+
+    function loadPeriod() {
+        db.collection("settings").doc("appConfig").get().then((doc) => {
+            const infoSpan = document.getElementById('currentPeriodInfo');
+            
+            if (doc.exists) {
+                const data = doc.data();
+                if(data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate || !data.endDate) {
+                    document.getElementById('periodName').value = "";
+                    document.getElementById('startDate').value = "";
+                    document.getElementById('endDate').value = "";
+                    currentActivePeriod = "";
+                    
+                    // 💡 마감 상태일 때는 안내 텍스트 숨김 처리
+                    infoSpan.style.display = 'none';
+                    infoSpan.innerHTML = "";
+                } else {
+                    if(data.periodName) {
+                        document.getElementById('periodName').value = data.periodName;
+                        currentActivePeriod = data.periodName;
+                    }
+                    const sDate = data.startDate.split('T')[0];
+                    const eDate = data.endDate.split('T')[0];
+                    document.getElementById('startDate').value = sDate;
+                    document.getElementById('endDate').value = eDate;
+
+                    // 💡 정상 운영 중일 때 소형 텍스트 안내문 노출
+                    infoSpan.style.display = 'inline-flex';
+                    infoSpan.innerHTML = `📢 현재 활성: <strong>${currentActivePeriod}</strong> (${sDate} ~ ${eDate})`;
+                }
+            } else {
+                infoSpan.style.display = 'none';
+            }
+            fetchData();
+        });
+    }
+
+    window.savePeriod = function() {
+        const pName = document.getElementById('periodName').value;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        if(!pName || !start || !end) { alert("차수명과 날짜를 모두 입력해주세요."); return; }
+        
+        db.collection("settings").doc("appConfig").set({
+            periodName: pName, startDate: start + "T00:00:00", endDate: end + "T23:59:59"
+        }).then(() => { alert(`[${pName}] 신청 기간이 열렸습니다!`); loadPeriod(); }).catch((e) => alert(e));
+    }
+
+    window.cancelPeriod = function() {
+        if(confirm("현재 설정된 신청 기간을 취소하고 접수를 마감하시겠습니까?")) {
+            db.collection("settings").doc("appConfig").set({
+                periodName: "", startDate: "CLOSED", endDate: "CLOSED"
+            }).then(() => { alert("신청 기간이 취소되었습니다."); loadPeriod(); }).catch((e) => alert(e));
+        }
+    }
+
+    window.toggleTrash = function(e) {
+        const container = document.getElementById('trashContainer');
+        const content = document.getElementById('trashContent');
+        const title = document.getElementById('trashTitle');
+        const icon = document.getElementById('trashToggleIcon');
+
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            content.style.display = 'block';
+            title.style.color = '#c0392b';
+            icon.style.color = '#c0392b';
+            icon.innerText = '▲';
+        } else {
+            container.classList.add('collapsed');
+            content.style.display = 'none';
+            title.style.color = '#888';
+            icon.style.color = '#888';
+            icon.innerText = '▼';
+        }
+    }
+
+    window.fetchData = function() {
+        document.getElementById('loadingMsg').style.display = 'block';
+        
+        db.collection("businessCards").get().then((querySnapshot) => {
+            document.getElementById('loadingMsg').style.display = 'none';
+            allFetchedData = [];
+            trashGroupedData = {};
+            periodMaxTimeMap = {};
+            const periods = new Set();
+            const nowTime = new Date().getTime();
+            const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+            const deleteBatch = db.batch();
+            let needDeleteTrigger = false;
+
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                data.docId = doc.id;
+                data.period = (!data.period || data.period.trim() === "") ? "과거 데이터" : data.period;
+                const dataTime = data.timestamp ? data.timestamp.toDate().getTime() : 0;
+
+                if (data.isDeleted === true) {
+                    const deletedTime = data.deletedAt ? data.deletedAt.toDate().getTime() : 0;
+                    if (deletedTime > 0 && (nowTime - deletedTime > thirtyDaysMs)) {
+                        deleteBatch.delete(doc.ref);
+                        needDeleteTrigger = true;
+                        return;
+                    }
+                    if (!trashGroupedData[data.period]) {
+                        trashGroupedData[data.period] = { count: 0, date: data.deletedAt ? data.deletedAt.toDate().toLocaleString('ko-KR') : "알 수 없음" };
+                    }
+                    trashGroupedData[data.period].count++;
+                } else {
+                    periods.add(data.period);
+                    allFetchedData.push(data);
+                    
+                    if (!periodMaxTimeMap[data.period] || dataTime > periodMaxTimeMap[data.period]) {
+                        periodMaxTimeMap[data.period] = dataTime;
+                    }
+                }
+            });
+
+            if(needDeleteTrigger) {
+                deleteBatch.commit().then(() => { console.log("만료 데이터 자동 소각 완료."); });
+            }
+
+            let sortedPeriodsArray = Array.from(periods).sort((a, b) => {
+                const timeA = periodMaxTimeMap[a] || 0;
+                const timeB = periodMaxTimeMap[b] || 0;
+                return timeB - timeA;
+            });
+
+            const filterSelect = document.getElementById('periodFilter');
+            const previousSelectedValue = filterSelect.value;
+            
+            filterSelect.innerHTML = '<option value="전체">전체 보기</option>';
+            sortedPeriodsArray.forEach(p => { filterSelect.innerHTML += `<option value="${p}">${p}</option>`; });
+
+            if (previousSelectedValue && (periods.has(previousSelectedValue) || previousSelectedValue === "전체")) {
+                filterSelect.value = previousSelectedValue;
+            } else if (sortedPeriodsArray.length > 0) {
+                filterSelect.value = sortedPeriodsArray[0];
+            } else {
+                filterSelect.value = "전체";
+            }
+
+            applyFiltersAndSort();
+            renderTrashTable();
+        });
+    }
+
+    window.applyFiltersAndSort = function() {
+        const selectedPeriod = document.getElementById('periodFilter').value;
+        const sortOption = document.getElementById('sortOption').value;
+
+        const deleteBtn = document.getElementById('deletePeriodBtn');
+        if (selectedPeriod === "전체") { deleteBtn.style.display = 'none'; } 
+        else { deleteBtn.style.display = 'inline-flex'; }
+
+        let displayData = allFetchedData.filter(data => selectedPeriod === "전체" || data.period === selectedPeriod);
+
+        displayData.sort((a, b) => {
+            if (sortOption === "time") {
+                const timeA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
+                const timeB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
+                return timeB - timeA;
+            } 
+            else if (sortOption === "branch") {
+                return (a.branchName || "").localeCompare(b.branchName || "");
+            } 
+            else if (sortOption === "cardType") {
+                const typeWeight = { "일반명함": 1, "스티커명함": 2, "3단명함": 3 };
+                const weightA = typeWeight[a.cardType] || 99;
+                const weightB = typeWeight[b.cardType] || 99;
+                return weightA !== weightB ? weightA - weightB : (a.branchName || "").localeCompare(b.branchName || "");
+            }
+        });
+
+        const tbody = document.getElementById('dataBody');
+        tbody.innerHTML = '';
+        filteredDataForExcel = [];
+
+        displayData.forEach(data => {
+            const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString('ko-KR') : "";
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><span style="background:#e9ecef; padding:3px 6px; border-radius:4px; font-size:0.9em;">${data.period}</span></td>
+                            <td>${dateStr}</td><td>${data.cardType}</td><td>${data.branchName}</td>
+                            <td>${data.position}</td><td>${data.userName}</td><td>${data.address}</td>
+                            <td>${data.tel}</td><td>${data.mobile}</td><td>${data.quantity}</td>`;
+            tbody.appendChild(tr);
+
+            filteredDataForExcel.push({
+                "신청 차수": data.period, "신청일시": dateStr, "명함 종류": data.cardType, "본부명": data.branchName,
+                "직책": data.position, "이름": data.userName, "주소": data.address, "TEL": data.tel, "Mobile": data.mobile, "수량": data.quantity
+            });
+        });
+    }
+
+    function getDocsByPeriod(pName) {
+        if (pName === "과거 데이터") {
+            return db.collection("businessCards").get().then(snap => {
+                let docs = [];
+                snap.forEach(doc => {
+                    let d = doc.data();
+                    if (!d.period || d.period.trim() === "" || d.period === "과거 데이터") {
+                        docs.push(doc);
+                    }
+                });
+                return docs;
+            });
+        } else {
+            return db.collection("businessCards").where("period", "==", pName).get().then(snap => {
+                let docs = [];
+                snap.forEach(doc => docs.push(doc));
+                return docs;
+            });
+        }
+    }
+
+    window.trashSelectedPeriodData = function() {
+        const selectedPeriod = document.getElementById('periodFilter').value;
+        if(selectedPeriod === "전체") return;
+
+        if(confirm(`[${selectedPeriod}] 차수의 모든 데이터를 휴지통으로 버리시겠습니까?\n버려진 데이터는 휴지통 영역에서 30일간 복구할 수 있습니다.`)) {
+            document.getElementById('loadingMsg').innerText = "휴지통으로 이동 중...";
+            document.getElementById('loadingMsg').style.display = 'block';
+
+            getDocsByPeriod(selectedPeriod).then((docs) => {
+                const batch = db.batch();
+                docs.forEach((doc) => {
+                    batch.update(doc.ref, {
+                        isDeleted: true,
+                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+                return batch.commit();
+            }).then(() => {
+                alert("선택하신 차수가 휴지통으로 이동되었습니다.");
+                document.getElementById('periodFilter').value = "";
+                fetchData();
+            }).catch(e => alert("이동 에러: " + e));
+        }
+    }
+
+    function renderTrashTable() {
+        const trashTbody = document.getElementById('trashBody');
+        trashTbody.innerHTML = '';
+
+        const trashPeriods = Object.keys(trashGroupedData);
+        if(trashPeriods.length === 0) {
+            trashTbody.innerHTML = '<tr><td colspan="4" style="color:#999; padding:15px;">휴지통이 비어 있습니다.</td></tr>';
+            return;
+        }
+
+        trashPeriods.forEach(pName => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:bold; color:#c0392b;">${pName}</td>
+                <td>${trashGroupedData[pName].date}</td>
+                <td>${trashGroupedData[pName].count} 건</td>
+                <td>
+                    <button class="btn-trash-action" style="color:blue; font-weight:bold;" onclick="restorePeriod('${pName}')">↩️ 복구</button>
+                    <button class="btn-trash-action" style="color:red;" onclick="permanentlyDeletePeriod('${pName}')">💥 영구삭제</button>
+                </td>
+            `;
+            trashTbody.appendChild(tr);
+        });
+    }
+
+    window.restorePeriod = function(pName) {
+        if(confirm(`[${pName}] 차수 신청 데이터들을 다시 정상 복구하시겠습니까?`)) {
+            getDocsByPeriod(pName).then((docs) => {
+                const batch = db.batch();
+                docs.forEach(doc => {
+                    batch.update(doc.ref, {
+                        isDeleted: firebase.firestore.FieldValue.delete(),
+                        deletedAt: firebase.firestore.FieldValue.delete()
+                    });
+                });
+                return batch.commit();
+            }).then(() => { alert("성공적으로 복구되었습니다."); fetchData(); });
+        }
+    }
+
+    window.permanentlyDeletePeriod = function(pName) {
+        if(confirm(`⚠️ 진짜 최종 경고!\n[${pName}] 차수의 모든 명함 신청 기록이 구글 서버에서 영구히 삭제되어 절대 복구할 수 없습니다. 계속하시겠습니까?`)) {
+            getDocsByPeriod(pName).then((docs) => {
+                const batch = db.batch();
+                docs.forEach(doc => { batch.delete(doc.ref); });
+                return batch.commit();
+            }).then(() => { alert("영구 삭제되었습니다."); fetchData(); });
+        }
+    }
+
+    window.clearTrashEntirely = function() {
+        const trashPeriods = Object.keys(trashGroupedData);
+        if(trashPeriods.length === 0) { alert("비울 휴지통이 없습니다."); return; }
+
+        if(confirm("⚠️ 휴지통 전체 비우기를 실행하시겠습니까?\n현재 휴지통에 담긴 모든 데이터가 영구 삭제되며 복구가 불가능합니다.")) {
+            db.collection("businessCards").where("isDeleted", "==", true).get().then((querySnapshot) => {
+                const batch = db.batch();
+                querySnapshot.forEach(doc => { batch.delete(doc.ref); });
+                return batch.commit();
+            }).then(() => { alert("휴지통을 깨끗하게 비웠습니다."); fetchData(); });
+        }
+    }
+
+    window.downloadExcel = function() {
+        if(filteredDataForExcel.length === 0) { alert("다운로드할 데이터가 없습니다."); return; }
+        const selectedPeriod = document.getElementById('periodFilter').value;
+        const sortText = document.getElementById("sortOption").options[document.getElementById("sortOption").selectedIndex].text;
+        const fileName = selectedPeriod === "전체" ? `전체_명함신청내역(${sortText}).xlsx` : `${selectedPeriod}_명함신청내역(${sortText}).xlsx`;
+        
+        const worksheet = XLSX.utils.json_to_sheet(filteredDataForExcel);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "신청내역");
+        XLSX.writeFile(workbook, fileName);
+    }
+</script>
+</body>
+</html>

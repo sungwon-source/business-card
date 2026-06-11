@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>명함 신청</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; max-width: 800px; margin: auto; background-color: #f4f7f6; }
+        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        #closedMessage { display: none; text-align: center; padding: 50px 20px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; color: #856404; margin-top: 30px; }
+        #closedMessage h3 { font-size: 1.5em; margin-bottom: 15px; }
+        #mainContent { display: none; }
+        .notice { background-color: #e9ecef; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 25px; font-size: 0.95em; line-height: 1.5; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; color: #444; }
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        input[readonly] { background-color: #f0f0f0; color: #555; }
+        .info-text { font-size: 0.8em; color: #888; margin-top: 5px; display: block; }
+        .autocomplete-container { position: relative; }
+        .autocomplete-items { position: absolute; border: 1px solid #ccc; border-radius: 0 0 4px 4px; z-index: 99; top: 100%; left: 0; right: 0; background-color: #fff; max-height: 200px; overflow-y: auto; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); display: none; }
+        .autocomplete-items div { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+        .autocomplete-items div:hover { background-color: #f1f1f1; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-add { background-color: #28a745; color: white; margin-top: 10px; }
+        .btn-submit { background-color: #0056b3; color: white; padding: 15px; margin-top: 20px; font-size: 18px; }
+        .btn-submit:hover { background-color: #004494; }
+        .btn-delete { background-color: #dc3545; color: white; padding: 5px 10px; font-size: 12px; width: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 20px;}
+        th, td { border: 1px solid #ddd; padding: 10px; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>명함 신청 <span id="displayPeriodName" style="color:#0056b3; font-size:0.6em;"></span></h2>
+    
+    <div id="closedMessage">
+        <h3>🚫 현재는 명함 신청 기간이 아닙니다.</h3>
+        <p id="periodText">다음 신청 기간에 다시 접속해 주세요.</p>
+    </div>
+
+    <div id="mainContent">
+        <div class="notice">
+            <strong>[명함 신청 안내]</strong><br>- 일반명함 1세트 = 200장<br>- 3단명함 1세트 = 100장<br>- 스티커명함 1세트 = 500장
+        </div>
+
+        <form id="inputForm">
+            <div class="form-row">
+                <div class="form-group autocomplete-container">
+                    <label>본부명</label>
+                    <input type="text" id="branchName" placeholder="클릭하거나 검색하세요" autocomplete="off" required>
+                    <div id="autocomplete-list" class="autocomplete-items"></div>
+                </div>
+                <div class="form-group">
+                    <label>명함 종류</label>
+                    <select id="cardType" required><option value="">선택하세요</option><option value="일반명함">일반명함</option><option value="3단명함">3단명함</option><option value="스티커명함">스티커명함</option></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>주소</label><input type="text" id="address" readonly></div>
+                <div class="form-group"><label>TEL</label><input type="text" id="tel" readonly><span class="info-text">* 주소/연락처 변경은 교육혁신팀으로 문의</span></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>직책</label><select id="position" required><option value="">선택하세요</option><option value="선생님">선생님</option><option value="팀장">팀장</option></select></div>
+                <div class="form-group"><label>이름</label><input type="text" id="userName" required></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Mobile (핸드폰 번호)</label><input type="text" id="mobile" maxlength="13" required></div>
+                <div class="form-group"><label>수량</label><input type="number" id="quantity" min="1" required></div>
+            </div>
+            <button type="submit" class="btn-add">↓ 신청자 목록에 추가하기 ↓</button>
+        </form>
+
+        <div class="table-container" style="margin-top:30px; border-top:2px solid #333;">
+            <h3 style="margin-top: 20px;">신청자 확인 목록 <span id="listCount" style="color: #0056b3; font-size: 0.8em;">(총 0명)</span></h3>
+            <table>
+                <thead><tr><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>Mobile</th><th>수량</th><th>관리</th></tr></thead>
+                <tbody id="applicantList"><tr><td colspan="7" style="text-align:center; color:#888;">추가된 신청자가 없습니다.</td></tr></tbody>
+            </table>
+            <button type="button" class="btn-submit" id="finalSubmitBtn" style="display: none;">최종 신청 제출하기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAE9nrPC2aA2wzd-hmIwkPnyq1ox4JGtOo",
+      authDomain: "businesscard-app-84975.firebaseapp.com",
+      projectId: "businesscard-app-84975",
+      storageBucket: "businesscard-app-84975.firebasestorage.app",
+      messagingSenderId: "819439880082",
+      appId: "1:819439880082:web:f4a94905a3aeb8f337234b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let currentActivePeriod = "미지정 차수";
+
+    window.onload = function() {
+        db.collection("settings").doc("appConfig").get().then((doc) => {
+            let isOpen = true;
+            if (doc.exists) {
+                const data = doc.data();
+                
+                if (data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate || !data.endDate) {
+                    isOpen = false;
+                    document.getElementById('periodText').innerHTML = `현재 열려있는 정기 명함 신청 기간이 아닙니다.`;
+                } else {
+                    currentActivePeriod = data.periodName || "미지정 차수";
+                    document.getElementById('displayPeriodName').innerText = `[${currentActivePeriod}]`;
+                    
+                    const now = new Date();
+                    const start = new Date(data.startDate);
+                    const end = new Date(data.endDate);
+                    if (now < start || now > end) {
+                        isOpen = false;
+                        document.getElementById('periodText').innerHTML = `신청 기간: <strong>${data.startDate.split('T')[0]} ~ ${data.endDate.split('T')[0]}</strong>`;
+                    }
+                }
+            } else {
+                isOpen = false;
+                document.getElementById('periodText').innerHTML = `현재 열려있는 정기 명함 신청 기간이 아닙니다.`;
+            }
+            
+            if (isOpen) { document.getElementById('mainContent').style.display = 'block'; } 
+            else { document.getElementById('closedMessage').style.display = 'block'; }
+        }).catch(() => {
+            document.getElementById('closedMessage').style.display = 'block';
+        });
+    };
+
+    const branchData = {
+        "강남/송파영업본부": { "address": "서울특별시 강남구 일원로5길 74, 2층", "tel": "02-475-1681" },
+        "강동/하남영업본부": { "address": "경기도 하남시 미사강변대로 76, 503호", "tel": "031-268-8914" },
+        "강서/양천/영등포영업본부": { "address": "서울특별시 강서구 공항대로 382, 롯데캐슬아파트상가 3층 304호", "tel": "02-2685-2716" },
+        "강원영서영업본부": { "address": "강원특별자치도 원주시 단관초교길 30-18, 1층", "tel": "033-766-7521" },
+        "광주남구에이스영업본부": { "address": "광주광역시 서구 상무민주로123번길 11, 희망봉빌딩 1층", "tel": "062-651-0546" },
+        "광주남구한마음영업본부": { "address": "광주광역시 남구 서문대로627번안길 16, 3층", "tel": "062-654-0068" },
+        "광주베스트영업본부": { "address": "광주광역시 광산구 풍영로229번안길 20, 1층", "tel": "062-373-6035" },
+        "구로/금천/광명영업본부": { "address": "경기도 광명시 소하로 190, 광명G타워 B동 617호", "tel": "02-865-0713" },
+        "김해/창원영업본부": { "address": "경상남도 김해시 금관대로1364번길 7-1, 1층", "tel": "055-237-3149" },
+        "노원/도봉영업본부": { "address": "서울특별시 노원구 동일로246길 46, 202호", "tel": "02-905-6138" },
+        "대구달서/달성영업본부": { "address": "대구광역시 달서구 조암로 62, 행복빌딩 4층", "tel": "053-593-1999" },
+        "대구동부/시지영업본부": { "address": "대구광역시 동구 과학로6길 14, 1층", "tel": "053-961-3114" },
+        "대구서북부영업본부": { "address": "대구광역시 북구 태암로22, 힐링타운 1층", "tel": "053-323-4612" },
+        "대구중부/수성영업본부": { "address": "대구광역시 동구 화랑로37길 79, 2층", "tel": "053-744-2427" },
+        "대전둔산/유성영업본부": { "address": "대전광역시 서구 대덕대로162번길 43, 둔산코아 401호", "tel": "042-477-4743" },
+        "대전문화영업본부": { "address": "대전광역시 중구 문화로 170, 반석빌딩 3층", "tel": "042-585-0430" },
+        "덕양영업본부": { "address": "경기도 고양시 덕양구 고양대로1384번길 9, 3층", "tel": "031-968-6192" },
+        "동대문/중랑/성동영업본부": { "address": "서울특별시 동대문구 전농로10길 20, 청솔우성아파트상가 206호", "tel": "02-962-2308" },
+        "부산동부영업본부": { "address": "부산광역시 부산진구 진연로9번길 19, 202호", "tel": "051-557-6077" },
+        "부산북구양산영업본부": { "address": "경상남도 양산시 물금읍 버들길 41-18, 1층", "tel": "055-381-0162" },
+        "부산서부영업본부": { "address": "부산광역시 강서구 명지국제8로 287, 오성빌딩 403호", "tel": "051-205-6592" },
+        "부산중부영업본부": { "address": "부산광역시 부산진구 신암로 66, 115호", "tel": "051-312-7747" },
+        "부천/부평영업본부": { "address": "인천광역시 부평구 부개로 61-6, 202호", "tel": "032-328-1430" },
+        "서대문/마포/은평영업본부": { "address": "서울특별시 은평구 증산서길 64, 4층", "tel": "02-303-8131" },
+        "서초/동작/관악영업본부": { "address": "서울특별시 서초구 고무래로 18-4, 4층", "tel": "02-522-0788" },
+        "성남분당영업본부": { "address": "경기도 성남시 중원구 여수울로 15번길 14-9, 1층", "tel": "031-716-1343" },
+        "세종영업본부": { "address": "세종특별자치시 마음로 49, 상가동 C-006호", "tel": "044-414-9897" },
+        "수원영업본부": { "address": "경기도 수원시 영통구 신원로55, 테크트리영통 7층 703호", "tel": "031-267-4048" },
+        "아산영업본부": { "address": "충청남도 아산시 번영로206번길 37-3, 101호", "tel": "041-547-4011" },
+        "안산/시흥영업본부": { "address": "경기도 시흥시 시청로68번길 14, 3층", "tel": "031-503-7124" },
+        "안양영업본부": { "address": "경기도 안양시 동안구 시민대로 401, 대륭테크노타운15차 326호", "tel": "031-451-9129" },
+        "오산/화성영업본부": { "address": "경기도 화성시 노작로4길 22-11, 1층", "tel": "031-231-2241" },
+        "용인영업본부": { "address": "경기도 용인시 기흥구 구성로 357, C동 604호", "tel": "031-272-5884" },
+        "울산영업본부": { "address": "울산광역시 중구 태화로 165-1, 1층", "tel": "052-221-2235" },
+        "인천남동/연수영업본부": { "address": "인천광역시 남동구 소래역동로 15, 1층", "tel": "032-461-6606" },
+        "인천서구/계양/김포영업본부": { "address": "인천광역시 서구 서곶로 543, B-2 성원아이북랜드", "tel": "032-543-0395" },
+        "일산/파주영업본부": { "address": "경기도 고양시 일산동구 숲속마을1로 26, 204호", "tel": "031-975-1249" },
+        "전주영업본부": { "address": "전북특별자치도 전주시 완산구 화산천변3길, 8-3", "tel": "063-226-4297" },
+        "천안영업본부": { "address": "충청남도 천안시 서북구 두정고6길 11-10, 태산빌딩 2층", "tel": "041-574-2335" },
+        "청주영업본부": { "address": "충청북도 청주시 흥덕구 서경로12번길 12, 1층", "tel": "043-237-7198" },
+        "평택/안성영업본부": { "address": "경기도 평택시 서재4길 26-1, 1층", "tel": "031-654-1540" }
+    };
+
+    let applicants = [];
+    const branchInput = document.getElementById('branchName');
+    const autocompleteList = document.getElementById('autocomplete-list');
+
+    function renderAutocomplete(filterText) {
+        autocompleteList.innerHTML = ''; 
+        let hasItem = false;
+        for (let branch in branchData) {
+            if (branch.includes(filterText)) {
+                hasItem = true;
+                let item = document.createElement('div');
+                item.innerHTML = filterText ? branch.replace(new RegExp(`(${filterText})`, 'gi'), "<strong>$1</strong>") : branch;
+                
+                item.addEventListener('click', function() {
+                    branchInput.value = branch;
+                    autocompleteList.style.display = 'none';
+                    document.getElementById('address').value = branchData[branch].address;
+                    document.getElementById('tel').value = branchData[branch].tel;
+                });
+                autocompleteList.appendChild(item);
+            }
+        }
+        autocompleteList.style.display = hasItem ? 'block' : 'none';
+    }
+
+    branchInput.addEventListener('input', function() {
+        renderAutocomplete(this.value);
+    });
+
+    branchInput.addEventListener('focus', function() {
+        renderAutocomplete(this.value);
+    });
+
+    document.addEventListener('click', e => { if (e.target !== branchInput) autocompleteList.style.display = 'none'; });
+
+    document.getElementById('mobile').addEventListener('input', function(e) {
+        let val = this.value.replace(/[^0-9]/g, '');
+        if(val.length > 3 && val.length <= 7) this.value = val.slice(0,3) + '-' + val.slice(3);
+        else if(val.length > 7) this.value = val.slice(0,3) + '-' + val.slice(3,7) + '-' + val.slice(7, 11);
+        else this.value = val;
+    });
+
+    document.getElementById('inputForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const bName = branchInput.value;
+        if(!branchData[bName]) { alert("목록에 있는 정확한 본부명을 선택해주세요."); return; }
+
+        applicants.push({
+            branchName: bName, cardType: document.getElementById('cardType').value,
+            address: document.getElementById('address').value, tel: document.getElementById('tel').value,
+            position: document.getElementById('position').value, userName: document.getElementById('userName').value,
+            mobile: document.getElementById('mobile').value, quantity: document.getElementById('quantity').value
+        });
+        renderTable();
+        ['cardType','position','userName','mobile','quantity'].forEach(id => document.getElementById(id).value = '');
+    });
+
+    function renderTable() {
+        const tbody = document.getElementById('applicantList');
+        tbody.innerHTML = '';
+        if(applicants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">추가된 신청자가 없습니다.</td></tr>';
+            document.getElementById('finalSubmitBtn').style.display = 'none';
+        } else {
+            applicants.forEach((app, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${app.cardType}</td><td>${app.branchName}</td><td>${app.position}</td><td>${app.userName}</td><td>${app.mobile}</td><td>${app.quantity}</td><td><button type="button" class="btn-delete" onclick="window.deleteRow(${idx})">삭제</button></td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('finalSubmitBtn').style.display = 'block';
+        }
+        document.getElementById('listCount').innerText = `(총 ${applicants.length}명)`;
+    }
+
+    window.deleteRow = function(index) { applicants.splice(index, 1); renderTable(); };
+
+    document.getElementById('finalSubmitBtn').addEventListener('click', async function() {
+        if(applicants.length === 0) return;
+        if(confirm(`총 ${applicants.length}명의 명함을 신청하시겠습니까?`)) {
+            const btn = document.getElementById('finalSubmitBtn');
+            btn.innerText = '데이터 전송 중...'; btn.disabled = true;
+            try {
+                for (let app of applicants) {
+                    await db.collection("businessCards").add({
+                        period: currentActivePeriod,
+                        ...app,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                alert('성공적으로 제출되었습니다!');
+                applicants = []; renderTable();
+            } catch (error) { alert("오류가 발생했습니다."); } 
+            finally { btn.innerText = '최종 신청 제출하기'; btn.disabled = false; }
+        }
+    });
+</script>
+</body>
+</html>
