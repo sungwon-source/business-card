@@ -26,10 +26,11 @@
         .autocomplete-items div:hover { background-color: #f1f1f1; }
         button { width: 100%; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
         
-        .btn-add { background-color: #6c757d; color: white; margin-top: 10px; border: 2px dashed #ccc; }
-        .btn-add:hover { background-color: #5a6268; }
-        .btn-submit { background-color: #0056b3; color: white; padding: 15px; margin-top: 20px; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        .btn-submit:hover { background-color: #004494; }
+        .btn-add { background-color: #0056b3; color: white; margin-top: 10px; }
+        .btn-add:hover { background-color: #004494; }
+        
+        .btn-submit { background-color: #28a745; color: white; padding: 15px; margin-top: 10px; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .btn-submit:hover { background-color: #218838; }
         .btn-delete { background-color: #dc3545; color: white; padding: 5px 10px; font-size: 12px; width: auto; }
         
         table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 10px;}
@@ -40,6 +41,9 @@
         .btn-excel { background-color: #217346; color: white; padding: 15px; font-size: 16px; margin-top: 15px; }
         .btn-excel:hover { background-color: #1e6b40; }
         .btn-return { background-color: #fff; color: #333; border: 1px solid #ccc; padding: 10px; font-size: 14px; margin-top: 10px; }
+
+        .submit-guide { text-align: center; color: #d9534f; font-weight: bold; margin-top: 25px; margin-bottom: 5px; font-size: 0.95em; }
+        .history-table th { background-color: #e8f5e9; color: #2e7d32; }
     </style>
 </head>
 <body>
@@ -80,16 +84,20 @@
                 <div class="form-group"><label>Mobile (핸드폰 번호)</label><input type="text" id="mobile" maxlength="13" required></div>
                 <div class="form-group"><label>수량</label><input type="number" id="quantity" min="1" required></div>
             </div>
-            <button type="submit" class="btn-add">↓ 아래 목록에 임시저장 (추가하기) ↓</button>
+            
+            <button type="submit" class="btn-add">➕ 신청자 추가</button>
         </form>
 
         <div id="tableSection" class="table-container" style="margin-top:40px; border-top:3px solid #333; padding-top:20px;">
-            <h3 style="margin-top: 0;">신청자 확인 목록 <span style="font-size: 0.7em; color: #dc3545;">(현재 컴퓨터에 임시저장 중)</span> <span id="listCount" style="color: #0056b3; font-size: 0.8em; float:right;">총 0명</span></h3>
+            <h3 style="margin-top: 0;">명단 확인 <span id="listCount" style="color: #0056b3; font-size: 0.8em; float:right;">총 0명</span></h3>
             <table>
                 <thead><tr><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>Mobile</th><th>수량</th><th>관리</th></tr></thead>
-                <tbody id="applicantList"><tr><td colspan="7" style="text-align:center; color:#888;">추가된 신청자가 없습니다.</td></tr></tbody>
+                <tbody id="applicantList"><tr><td colspan="7" style="text-align:center; color:#888;">아직 담긴 명단이 없습니다.</td></tr></tbody>
             </table>
-            <!-- 💡 제출 버튼 이름 변경 -->
+            
+            <div id="submitGuideText" class="submit-guide" style="display: none;">
+                📢 명단에 신청자를 모두 넣은 뒤 제출하기를 꼭 눌러주세요!
+            </div>
             <button type="button" class="btn-submit" id="finalSubmitBtn" style="display: none;">📤 제출하기</button>
         </div>
 
@@ -98,7 +106,15 @@
             <p style="color: #555;">방금 서버로 제출하신 내역을 엑셀 파일로 다운로드하여 보관하실 수 있습니다.</p>
             <button type="button" class="btn-excel" onclick="downloadReceipt()">📥 신청 내역 다운로드</button>
             <br>
-            <button type="button" class="btn-return" onclick="resetAll()">돌아가기 (새로운 신청)</button>
+            <button type="button" class="btn-return" onclick="resetAll()">돌아가기 (추가 신청)</button>
+        </div>
+
+        <div id="historySection" style="display: none; margin-top: 50px; border-top: 3px double #2e7d32; padding-top: 25px;">
+            <h3 id="historyTitle" style="margin-top: 0; color: #2e7d32;">✅ 제출 완료 명단</h3>
+            <table class="history-table">
+                <thead><tr><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>Mobile</th><th>수량</th></tr></thead>
+                <tbody id="historyList"></tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -118,20 +134,21 @@
     let currentActivePeriod = "미지정 차수";
     let applicants = [];
     let lastSubmittedData = []; 
+    
+    // 💡 마감 시간 실시간 감지를 위한 시스템 변수
+    let systemEndDate = null;
+    let isSystemOpen = false;
 
     window.onload = function() {
         const savedData = localStorage.getItem("tempApplicants");
-        if(savedData) {
-            applicants = JSON.parse(savedData);
-        }
+        if(savedData) { applicants = JSON.parse(savedData); }
 
-        db.collection("settings").doc("appConfig").get().then((doc) => {
-            let isOpen = true;
+        // 💡 2번 방어: get() 대신 onSnapshot()을 써서 관리자가 마감 누르면 실시간으로 닫히게 연동
+        db.collection("settings").doc("appConfig").onSnapshot((doc) => {
             if (doc.exists) {
                 const data = doc.data();
                 if (data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate || !data.endDate) {
-                    isOpen = false;
-                    document.getElementById('periodText').innerHTML = `현재 열려있는 정기 명함 신청 기간이 아닙니다.`;
+                    forceCloseSystem(`현재 명함 신청 기간이 아닙니다.`);
                 } else {
                     currentActivePeriod = data.periodName || "미지정 차수";
                     document.getElementById('displayPeriodName').innerText = `[${currentActivePeriod}]`;
@@ -139,20 +156,68 @@
                     const now = new Date();
                     const start = new Date(data.startDate);
                     const end = new Date(data.endDate);
+                    systemEndDate = end;
+
                     if (now < start || now > end) {
-                        isOpen = false;
-                        document.getElementById('periodText').innerHTML = `신청 기간: <strong>${data.startDate.split('T')[0]} ~ ${data.endDate.split('T')[0]}</strong>`;
+                        forceCloseSystem(`신청 기간: <strong>${data.startDate.replace('T', ' ')} ~ ${data.endDate.replace('T', ' ')}</strong>`);
+                    } else {
+                        openSystem();
                     }
                 }
-            } else { isOpen = false; }
-            
-            if (isOpen) { 
-                document.getElementById('mainContent').style.display = 'block'; 
-                renderTable(); 
-            } 
-            else { document.getElementById('closedMessage').style.display = 'block'; }
-        }).catch(() => { document.getElementById('closedMessage').style.display = 'block'; });
+            } else { 
+                forceCloseSystem(`현재 명함 신청 기간이 아닙니다.`); 
+            }
+        });
+
+        // 💡 1번 방어: 5초마다 시계를 확인해서 시간이 지나면 얄짤없이 닫아버리는 타이머
+        setInterval(() => {
+            if (isSystemOpen && systemEndDate) {
+                const now = new Date();
+                if (now > systemEndDate) {
+                    alert("⚠️ 명함 신청 시간이 방금 마감되었습니다. 더 이상 추가 및 제출이 불가능합니다.");
+                    forceCloseSystem(`신청 기간이 마감되었습니다.`);
+                }
+            }
+        }, 5000);
     };
+
+    function forceCloseSystem(message) {
+        isSystemOpen = false;
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('closedMessage').style.display = 'block';
+        if(message) document.getElementById('periodText').innerHTML = message;
+    }
+
+    function openSystem() {
+        if(!isSystemOpen) {
+            isSystemOpen = true;
+            document.getElementById('closedMessage').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            checkHistory();
+            renderTable();
+        }
+    }
+
+    function checkHistory() {
+        const historyData = localStorage.getItem("history_" + currentActivePeriod);
+        const historySection = document.getElementById('historySection');
+        const tbody = document.getElementById('historyList');
+        
+        if(historyData) {
+            lastSubmittedData = JSON.parse(historyData);
+            document.getElementById('historyTitle').innerText = `✅ [${currentActivePeriod}] 제출 완료 명단`;
+            tbody.innerHTML = '';
+            
+            lastSubmittedData.forEach(app => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${app.cardType}</td><td>${app.branchName}</td><td>${app.position}</td><td>${app.userName}</td><td>${app.mobile}</td><td>${app.quantity}</td>`;
+                tbody.appendChild(tr);
+            });
+            historySection.style.display = 'block';
+        } else {
+            historySection.style.display = 'none';
+        }
+    }
 
     const branchData = {
         "강남/송파영업본부": { "address": "서울특별시 강남구 일원로5길 74, 2층", "tel": "02-475-1681" },
@@ -201,6 +266,33 @@
     const branchInput = document.getElementById('branchName');
     const autocompleteList = document.getElementById('autocomplete-list');
 
+    function validateAndSetBranch(selectedBranch) {
+        let existingBranch = "";
+        if (applicants.length > 0) {
+            existingBranch = applicants[0].branchName;
+        } else if (lastSubmittedData.length > 0) {
+            existingBranch = lastSubmittedData[0].branchName;
+        }
+
+        if (existingBranch && existingBranch !== selectedBranch) {
+            if (!confirm(`⚠️ 주의: 이전에 신청한 본부 [${existingBranch}] 와 다른 본부 [${selectedBranch}] 를 선택하셨습니다.\n선택하신 본부가 정말 맞습니까?`)) {
+                branchInput.value = existingBranch;
+                if(branchData[existingBranch]) {
+                    document.getElementById('address').value = branchData[existingBranch].address;
+                    document.getElementById('tel').value = branchData[existingBranch].tel;
+                }
+                return false;
+            }
+        }
+        
+        branchInput.value = selectedBranch;
+        if(branchData[selectedBranch]) {
+            document.getElementById('address').value = branchData[selectedBranch].address;
+            document.getElementById('tel').value = branchData[selectedBranch].tel;
+        }
+        return true;
+    }
+
     function renderAutocomplete(filterText) {
         autocompleteList.innerHTML = ''; 
         let hasItem = false;
@@ -210,10 +302,8 @@
                 let item = document.createElement('div');
                 item.innerHTML = filterText ? branch.replace(new RegExp(`(${filterText})`, 'gi'), "<strong>$1</strong>") : branch;
                 item.addEventListener('click', function() {
-                    branchInput.value = branch;
+                    validateAndSetBranch(branch);
                     autocompleteList.style.display = 'none';
-                    document.getElementById('address').value = branchData[branch].address;
-                    document.getElementById('tel').value = branchData[branch].tel;
                 });
                 autocompleteList.appendChild(item);
             }
@@ -224,6 +314,12 @@
     branchInput.addEventListener('input', function() { renderAutocomplete(this.value); });
     branchInput.addEventListener('focus', function() { renderAutocomplete(this.value); });
     document.addEventListener('click', e => { if (e.target !== branchInput) autocompleteList.style.display = 'none'; });
+
+    branchInput.addEventListener('change', function() {
+        if (branchData[this.value]) {
+            validateAndSetBranch(this.value);
+        }
+    });
 
     document.getElementById('mobile').addEventListener('input', function(e) {
         let val = this.value.replace(/[^0-9]/g, '');
@@ -236,11 +332,31 @@
         localStorage.setItem("tempApplicants", JSON.stringify(applicants));
     }
 
+    // 💡 3번 방어: 폼 제출(리스트에 명단 추가) 버튼 누를 때도 마감 체크!
     document.getElementById('inputForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        if (!isSystemOpen || (systemEndDate && new Date() > systemEndDate)) {
+            alert("⚠️ 이미 신청 기간이 마감되어 명단을 추가할 수 없습니다.");
+            return;
+        }
+
         const bName = branchInput.value;
         const inputUserName = document.getElementById('userName').value;
         if(!branchData[bName]) { alert("목록에 있는 정확한 본부명을 선택해주세요."); return; }
+
+        let existingBranch = "";
+        if (applicants.length > 0) {
+            existingBranch = applicants[0].branchName;
+        } else if (lastSubmittedData.length > 0) {
+            existingBranch = lastSubmittedData[0].branchName;
+        }
+        
+        if (existingBranch && existingBranch !== bName) {
+            if (!confirm(`⚠️ 주의: 이전에 신청한 본부 [${existingBranch}] 와 다른 본부 [${bName}] 를 선택하셨습니다.\n선택하신 본부가 정말 맞습니까?`)) {
+                return; 
+            }
+        }
 
         const isDuplicate = applicants.some(app => app.userName === inputUserName);
         if(isDuplicate) {
@@ -266,8 +382,9 @@
         const tbody = document.getElementById('applicantList');
         tbody.innerHTML = '';
         if(applicants.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">추가된 신청자가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">아직 담긴 명단이 없습니다.</td></tr>';
             document.getElementById('finalSubmitBtn').style.display = 'none';
+            document.getElementById('submitGuideText').style.display = 'none';
         } else {
             applicants.forEach((app, idx) => {
                 const tr = document.createElement('tr');
@@ -275,6 +392,7 @@
                 tbody.appendChild(tr);
             });
             document.getElementById('finalSubmitBtn').style.display = 'block';
+            document.getElementById('submitGuideText').style.display = 'block';
         }
         document.getElementById('listCount').innerText = `총 ${applicants.length}명`;
     }
@@ -285,11 +403,16 @@
         renderTable(); 
     };
 
+    // 💡 4번 방어: 최종 제출 서버 전송 버튼 누르기 직전 마지막 마감 체크!
     document.getElementById('finalSubmitBtn').addEventListener('click', async function() {
+        if (!isSystemOpen || (systemEndDate && new Date() > systemEndDate)) {
+            alert("⚠️ 이미 신청 기간이 마감되어 서버로 제출할 수 없습니다.");
+            return;
+        }
+        
         if(applicants.length === 0) return;
         if(confirm(`위 목록에 있는 총 ${applicants.length}명의 명함을 제출하시겠습니까?\n제출 후에는 수정할 수 없습니다.`)) {
             const btn = document.getElementById('finalSubmitBtn');
-            // 💡 전송 중 텍스트 수정
             btn.innerText = '데이터 전송 중...'; btn.disabled = true;
             try {
                 for (let app of applicants) {
@@ -299,7 +422,19 @@
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
-                lastSubmittedData = [...applicants]; 
+                
+                const existingHistory = localStorage.getItem("history_" + currentActivePeriod);
+                let combinedHistory = [];
+                if (existingHistory) {
+                    combinedHistory = JSON.parse(existingHistory);
+                }
+                combinedHistory = combinedHistory.concat(applicants);
+                
+                lastSubmittedData = combinedHistory; 
+                localStorage.setItem("history_" + currentActivePeriod, JSON.stringify(combinedHistory));
+
+                checkHistory();
+
                 applicants = []; 
                 localStorage.removeItem("tempApplicants"); 
                 renderTable(); 
@@ -311,7 +446,6 @@
             } catch (error) { 
                 alert("오류가 발생했습니다. 잠시 후 다시 시도해주세요."); 
             } finally { 
-                // 💡 다시 돌아왔을 때 텍스트 수정
                 btn.innerText = '📤 제출하기'; btn.disabled = false; 
             }
         }
@@ -349,6 +483,7 @@
         document.getElementById('branchName').value = '';
         document.getElementById('address').value = '';
         document.getElementById('tel').value = '';
+        checkHistory(); 
     }
 </script>
 </body>

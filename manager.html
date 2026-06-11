@@ -7,127 +7,188 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f7f6; }
-        .container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 1200px; margin: auto; margin-bottom: 20px; transition: 0.3s; }
-        h2 { text-align: center; color: #333; margin-top: 0; }
-        #loginScreen { text-align: center; margin-top: 100px; }
-        #loginScreen input { padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
-        #loginScreen button { padding: 10px 20px; font-size: 16px; background-color: #333; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #adminScreen { display: none; }
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f8f9fa; color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        h2 { border-bottom: 2px solid #0056b3; padding-bottom: 10px; color: #0056b3; margin-top: 0; }
+        h3 { margin-top: 30px; color: #555; }
         
-        .setting-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #f39c12; }
-        .setting-box label { font-weight: bold; margin-right: 5px; }
-        .setting-box input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-right: 15px; }
+        #loginSection { text-align: center; padding: 100px 20px; }
+        #loginSection input { padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; width: 200px; text-align: center; }
+        #loginSection button { padding: 12px 24px; font-size: 16px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
         
-        .btn-save { background-color: #f39c12; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-cancel { background-color: #dc3545; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        #adminContent { display: none; }
         
-        /* 💡 현재 설정 기간 소형 텍스트 스타일 */
-        .current-info-text { font-size: 0.85em; color: #555; margin-left: 12px; display: none; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd; }
+        .status-panel { background: #fff; border-left: 6px solid #0056b3; border-radius: 4px; padding: 15px 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status-panel-info p { margin: 8px 0; font-size: 15px; color: #444; }
+        .status-panel-info strong { color: #0056b3; font-size: 1.1em; }
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.95em; display: inline-block; }
+        .status-open { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-closed { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
-        .filter-box { background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .filter-box label { font-weight: bold; }
-        .filter-box select { padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background-color: white; height: 40px; box-sizing: border-box; }
+        .config-box { background: #f1f3f5; padding: 20px; border-radius: 6px; margin-bottom: 30px; border: 1px solid #e9ecef; }
+        .form-row-grid { display: grid; grid-template-columns: 1.5fr 2fr 2fr; gap: 15px; margin-bottom: 12px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 5px; font-size: 0.9em; color: #444; }
+        .datetime-wrapper { display: flex; gap: 5px; }
+        input[type="text"], input[type="date"], input[type="time"] { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        input[type="date"] { flex: 1.3; }
+        input[type="time"] { flex: 1; }
         
-        .btn-excel { background-color: #217346; color: white; padding: 0 20px; height: 40px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-sizing: border-box; display: inline-flex; align-items: center; }
+        .btn-blue { background-color: #0056b3; color: white; padding: 12px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-blue:hover { background-color: #004494; }
+        .btn-red { background-color: #dc3545; color: white; padding: 12px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-red:hover { background-color: #bd2130; }
+        
+        .controls-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; margin-bottom: 10px; }
+        .filter-select { padding: 10px; font-size: 15px; border: 2px solid #0056b3; border-radius: 4px; font-weight: bold; color: #0056b3; cursor: pointer; }
+        
+        .btn-excel { background-color: #217346; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; margin-right: 5px;}
         .btn-excel:hover { background-color: #1e6b40; }
-        .btn-refresh { padding: 0 15px; height: 40px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; background-color: white; cursor: pointer; box-sizing: border-box; display: inline-flex; align-items: center; }
-        .btn-refresh:hover { background-color: #f0f0f0; }
         
-        .btn-delete-data { background-color: #c0392b; color: white; padding: 0 15px; height: 40px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-sizing: border-box; display: none; align-items: center; }
-        .btn-delete-data:hover { background-color: #962d22; }
+        .btn-batch-delete { background-color: #fff; color: #dc3545; border: 2px solid #dc3545; padding: 9px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .btn-batch-delete:hover { background-color: #dc3545; color: #fff; }
+        
+        /* 💡 일괄 복구 전용 버튼 스타일 */
+        .btn-batch-restore { background-color: #fff; color: #28a745; border: 2px solid #28a745; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .btn-batch-restore:hover { background-color: #28a745; color: #fff; }
 
-        .trash-box { background-color: #fce4d6; padding: 0; border-radius: 8px; margin-top: 40px; border-left: 4px solid #c0392b; overflow: hidden; }
-        .trash-box.collapsed { background-color: #f5f5f5; border-left: 4px solid #aaa; opacity: 0.7; }
-        .trash-box.collapsed:hover { opacity: 1; background-color: #eaeaea; }
+        .btn-trash-toggle { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; padding: 12px 25px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px; width: 100%; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-trash-toggle:hover { background-color: #dee2e6; color: #212529; }
         
-        .trash-header { padding: 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
-        .trash-header:hover { background-color: rgba(0,0,0,0.03); }
-        .trash-content-wrap { padding: 0 20px 20px 20px; display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; text-align: center; }
+        th, td { border: 1px solid #dee2e6; padding: 12px 8px; }
+        th { background-color: #f1f3f5; font-weight: bold; color: #495057; }
+        tr:hover { background-color: #f8f9fa; }
         
-        .btn-trash-action { padding: 5px 10px; font-size: 12px; cursor: pointer; margin-right: 5px; border-radius: 3px; border: 1px solid #ccc; background: white; }
-        .btn-clear-trash { background-color: #c0392b; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; float: right; margin-bottom: 10px; }
-
-        .table-wrapper { width: 100%; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 12px 10px; white-space: nowrap; }
-        th { background-color: #f8f9fa; font-weight: bold; }
+        .col-dim { font-size: 12px !important; color: #8c96a0 !important; word-break: break-all; font-family: '맑은 고딕', sans-serif; }
+        .col-no { font-size: 12px; color: #666; font-weight: bold; width: 35px; }
+        
+        .btn-row-delete { background-color: #fff; color: #dc3545; border: 1px solid #dc3545; padding: 4px 8px; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold; }
+        .btn-row-delete:hover { background-color: #dc3545; color: #fff; }
+        .btn-row-restore { background-color: #fff; color: #28a745; border: 1px solid #28a745; padding: 4px 8px; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold; margin-right: 5px; }
+        .btn-row-restore:hover { background-color: #28a745; color: #fff; }
+        
+        #recycleBinSection { display: none; margin-top: 20px; border: 3px solid #dc3545; border-radius: 8px; padding: 25px; background-color: #fffafb; }
+        .trash-sub-title { font-weight: bold; margin-top: 20px; margin-bottom: 8px; font-size: 14px; display: flex; align-items: center; gap: 5px; }
     </style>
 </head>
 <body>
 
-<div id="loginScreen">
-    <h2>관리자 접속</h2>
-    <input type="password" id="adminPwd" placeholder="비밀번호">
-    <button id="loginBtn" onclick="checkPassword()">확인</button>
+<div id="loginSection">
+    <h2>🔒 교육혁신팀 관리자 인증</h2>
+    <p style="color:#666; margin-bottom:20px;">관리자 비밀번호를 입력해 주세요.</p>
+    <input type="password" id="adminPassword" placeholder="비밀번호 입력" onkeypress="if(event.keyCode==13) checkLogin()">
+    <button onclick="checkLogin()">접속하기</button>
 </div>
 
-<div id="adminScreen">
-    <div class="container setting-box">
-        <h3 style="margin-top: 0; color: #d68910;">📅 새로운 명함 신청 열기 (차수/기간 설정)</h3>
-        <label>신청 차수명:</label><input type="text" id="periodName" placeholder="예: 26년 6월 신청" style="width: 150px;">
-        <label>시작일:</label><input type="date" id="startDate">
-        <label>종료일:</label><input type="date" id="endDate">
-        <button class="btn-save" onclick="savePeriod()">이 기간으로 열기</button>
-        <button class="btn-cancel" onclick="cancelPeriod()">기간 취소(마감)하기</button>
-        
-        <span id="currentPeriodInfo" class="current-info-text"></span>
+<div id="adminContent" class="container">
+    <h2>명함 신청 시스템 관리자 대시보드</h2>
+    
+    <div class="status-panel">
+        <div class="status-panel-info">
+            <p>📌 <strong>현재 활성화 중인 차수:</strong> <span id="activePeriodDisplay">조회 중...</span></p>
+            <p>🗓️ <strong>설정된 기간:</strong> <span id="activeDateDisplay">조회 중...</span></p>
+        </div>
+        <div>
+            <span id="currentStatusBadge" class="status-badge">조회 중...</span>
+        </div>
     </div>
 
-    <div class="container">
-        <h2>명함 신청 내역</h2>
-        
-        <div class="filter-box">
-            <label>조회:</label>
-            <select id="periodFilter" onchange="applyFiltersAndSort()"></select>
-            
-            <label style="margin-left: 10px;">정렬 방식:</label>
-            <select id="sortOption" onchange="applyFiltersAndSort()">
-                <option value="time">최신순</option>
-                <option value="branch">본부명</option>
-                <option value="cardType">명함종류</option>
+    <div class="config-box">
+        <h4 style="margin-top:0; color:#555; margin-bottom:15px;">⚙️ 새로운 차수 오픈 / 마감 설정</h4>
+        <div class="form-row-grid">
+            <div class="form-group">
+                <label>차수명</label>
+                <input type="text" id="periodName" placeholder="예: 26년 6월 명함신청">
+            </div>
+            <div class="form-group">
+                <label>시작 일시</label>
+                <div class="datetime-wrapper">
+                    <input type="date" id="startDate">
+                    <input type="time" id="startTime">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>종료 일시</label>
+                <div class="datetime-wrapper">
+                    <input type="date" id="endDate">
+                    <input type="time" id="endTime">
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 15px;">
+            <button class="btn-blue" onclick="saveConfig()">💡 명함 신청 시작</button>
+            <button class="btn-red" style="margin-left: 10px;" onclick="closeSystem()">🚫 명함 신청 마감</button>
+        </div>
+    </div>
+
+    <div class="controls-row">
+        <div>
+            <h3 style="margin: 0; padding-bottom: 5px; display: inline-block;">📋 접수 명단 (<span id="totalCount" style="color:#0056b3;">0</span>건)</h3>
+            <br>
+            <select id="filterPeriod" class="filter-select" onchange="renderMainTable()">
+                <option value="ALL">전체 차수 보기</option>
             </select>
-
-            <button id="deletePeriodBtn" class="btn-delete-data" onclick="trashSelectedPeriodData()">이 차수 데이터 삭제</button>
-
-            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-                <button class="btn-excel" onclick="downloadExcel()">엑셀 다운로드</button>
-                <button class="btn-refresh" onclick="fetchData()">새로고침</button>
-            </div>
         </div>
-
-        <p id="loadingMsg" style="color: blue;">데이터를 불러오는 중입니다...</p>
-        
-        <div class="table-wrapper">
-            <table>
-                <thead><tr><th>신청 차수</th><th>신청일시</th><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>주소</th><th>TEL</th><th>Mobile</th><th>수량</th></tr></thead>
-                <tbody id="dataBody"></tbody>
-            </table>
+        <div>
+            <button class="btn-excel" onclick="downloadAllToExcel()">📊 엑셀 다운로드</button>
+            <button class="btn-batch-delete" onclick="deleteSelectedPeriod()">🗑️ 선택 차수 삭제</button>
         </div>
     </div>
+    
+    <table id="mainTable">
+        <thead>
+            <tr>
+                <th class="col-no">No.</th>
+                <th style="width: 85px;">신청 차수</th>
+                <th style="width: 85px;">신청 일시</th>
+                <th>본부명</th>
+                <th>명함 종류</th>
+                <th>직책</th>
+                <th>이름</th>
+                <th>Mobile (핸드폰)</th>
+                <th>수량</th>
+                <th style="width: 60px;">관리</th>
+            </tr>
+        </thead>
+        <tbody id="rawHistoryList">
+            <tr><td colspan="10" style="padding:40px; color:#888;">데이터를 불러오는 중입니다...</td></tr>
+        </tbody>
+    </table>
 
-    <div class="container trash-box collapsed" id="trashContainer">
-        <div class="trash-header" onclick="toggleTrash(event)">
-            <h3 id="trashTitle" style="margin: 0; color: #888;">🗑️ 휴지통</h3>
-            <span id="trashToggleIcon" style="color: #888; font-size: 1.2em;">▼</span>
-        </div>
-        
-        <div id="trashContent" class="trash-content-wrap">
-            <p style="font-size: 0.85em; color: #666; margin-top: 0; margin-bottom: 5px;">* 휴지통에 버려진 차수는 신청자 화면과 조회 목록에서 숨겨지며, 30일이 지나면 자동 영구 삭제됩니다.</p>
-            <button class="btn-clear-trash" onclick="clearTrashEntirely()">휴지통 비우기</button>
-            <div style="clear:both;"></div>
-            <div class="table-wrapper">
-                <table style="background: #fff;">
-                    <thead style="background: #f5f5f5;">
-                        <tr><th>삭제된 차수명</th><th>삭제 처리일시</th><th>포함된 데이터 수</th><th>관리</th></tr>
-                    </thead>
-                    <tbody id="trashBody">
-                        <tr><td colspan="4" style="color:#999; padding:15px;">휴지통이 비어 있습니다.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div style="margin-top: 30px;">
+        <button class="btn-trash-toggle" id="toggleTrashBtn" onclick="toggleRecycleBin()">🗑️ 휴지통 (<span id="trashCount">0</span>)</button>
     </div>
+
+    <div id="recycleBinSection">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #dc3545; padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 style="color: #dc3545; margin: 0;">🗑️ 명함 신청 휴지통 보관소</h3>
+            <button type="button" class="btn-batch-delete" style="padding: 8px 16px; font-size: 13px;" onclick="emptyRecycleBin()">🧹 휴지통 비우기</button>
+        </div>
+        <p style="color: #777; font-size: 12.5px; margin-top: -5px; margin-bottom: 20px;">* 휴지통 명단은 엑셀에 포함되지 않으며, 보관 후 30일이 경과하면 복구 불가능하도록 자동 영구 파기됩니다.</p>
+        
+        <div class="trash-sub-title" style="color: #c82333;">📁 차수별 일괄 삭제 내역 (차수를 누르면 상세 명단이 열립니다)</div>
+        <div id="batchTrashListContainer" style="margin-bottom: 35px;"></div>
+
+        <div class="trash-sub-title" style="color: #5a6268;">👤 개별 낱개 삭제 내역</div>
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-no">No.</th>
+                    <th style="width: 85px;">신청 차수</th>
+                    <th>본부명</th>
+                    <th>명함 종류</th>
+                    <th>직책</th>
+                    <th>이름</th>
+                    <th style="width: 130px;">관리 (복구/영구삭제)</th>
+                </tr>
+            </thead>
+            <tbody id="individualTrashHistoryList">
+                <tr><td colspan="7" style="padding:20px; color:#888;">개별 삭제된 내역이 없습니다.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
 </div>
 
 <script>
@@ -142,349 +203,509 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    let allFetchedData = [];
-    let trashGroupedData = {};
-    let filteredDataForExcel = [];
-    let currentActivePeriod = "";
-    let periodMaxTimeMap = {};
+    let allActiveCards = []; 
+    let allDeletedCards = []; 
+    let currentConfigPeriod = ""; 
+    let isSystemActive = false;
+    let initialLoadDone = false; 
 
     window.onload = function() {
-        document.getElementById("adminPwd").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                document.getElementById("loginBtn").click();
-            }
-        });
-        if (sessionStorage.getItem("isAdminLoggedIn") === "true") {
-            showAdminScreen();
+        if(sessionStorage.getItem("adminLoggedIn") === "true") {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            initAdminSystem();
         }
     };
 
-    window.checkPassword = function() {
-        if (document.getElementById('adminPwd').value === "1234") {
-            sessionStorage.setItem("isAdminLoggedIn", "true");
-            showAdminScreen();
-        } else { alert("비밀번호가 틀렸습니다."); }
+    function checkLogin() {
+        const pw = document.getElementById('adminPassword').value;
+        if(pw === "1234") {
+            sessionStorage.setItem("adminLoggedIn", "true");
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            initAdminSystem();
+        } else {
+            alert("비밀번호가 올바르지 않습니다.");
+        }
     }
 
-    function showAdminScreen() {
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('adminScreen').style.display = 'block';
-        loadPeriod(); 
+    function initAdminSystem() {
+        loadConfig();
+        loadRequestHistory();
     }
 
-    function loadPeriod() {
+    function formatCleanDate(isoString) {
+        if(!isoString || isoString === "CLOSED") return "신청 기간 아님";
+        try {
+            const d = new Date(isoString);
+            return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        } catch(e) { return isoString; }
+    }
+
+    document.getElementById('periodName').addEventListener('click', function(e) {
+        if (isSystemActive) {
+            alert("⚠️ 현재 명함 신청 접수가 진행 중입니다!\n새로운 차수명이나 날짜를 설정하시려면, 먼저 우측의 [명함 신청 마감] 버튼을 눌러 기존 차수를 종료해 주세요.");
+            this.blur();
+        }
+    });
+
+    function loadConfig() {
         db.collection("settings").doc("appConfig").get().then((doc) => {
-            const infoSpan = document.getElementById('currentPeriodInfo');
-            
-            if (doc.exists) {
+            if(doc.exists) {
                 const data = doc.data();
-                if(data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate || !data.endDate) {
+                
+                const now = new Date();
+                let isClosed = false;
+                
+                if (data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate) {
+                    isClosed = true;
+                } else {
+                    const start = new Date(data.startDate);
+                    const end = new Date(data.endDate);
+                    if (now < start || now > end) {
+                        isClosed = true;
+                    }
+                }
+
+                isSystemActive = !isClosed;
+                currentConfigPeriod = isClosed ? "" : (data.periodName || "");
+
+                if (isClosed) {
+                    document.getElementById('activePeriodDisplay').innerText = "없음";
+                    
+                    const badge = document.getElementById('currentStatusBadge');
+                    badge.innerText = "⛔ 시스템 마감됨";
+                    badge.className = "status-badge status-closed";
+                    document.getElementById('activeDateDisplay').innerText = "신청 기간 아님";
+
                     document.getElementById('periodName').value = "";
                     document.getElementById('startDate').value = "";
+                    document.getElementById('startTime').value = "";
                     document.getElementById('endDate').value = "";
-                    currentActivePeriod = "";
-                    
-                    // 💡 마감 상태일 때는 안내 텍스트 숨김 처리
-                    infoSpan.style.display = 'none';
-                    infoSpan.innerHTML = "";
+                    document.getElementById('endTime').value = "";
                 } else {
-                    if(data.periodName) {
-                        document.getElementById('periodName').value = data.periodName;
-                        currentActivePeriod = data.periodName;
-                    }
-                    const sDate = data.startDate.split('T')[0];
-                    const eDate = data.endDate.split('T')[0];
-                    document.getElementById('startDate').value = sDate;
-                    document.getElementById('endDate').value = eDate;
+                    document.getElementById('activePeriodDisplay').innerText = data.periodName;
+                    
+                    const badge = document.getElementById('currentStatusBadge');
+                    badge.innerText = "✅ 신청 접수 중";
+                    badge.className = "status-badge status-open";
+                    document.getElementById('activeDateDisplay').innerText = `${formatCleanDate(data.startDate)} ~ ${formatCleanDate(data.endDate)}`;
 
-                    // 💡 정상 운영 중일 때 소형 텍스트 안내문 노출
-                    infoSpan.style.display = 'inline-flex';
-                    infoSpan.innerHTML = `📢 현재 활성: <strong>${currentActivePeriod}</strong> (${sDate} ~ ${eDate})`;
+                    document.getElementById('periodName').value = data.periodName || '';
+                    if(data.startDate && data.startDate !== "CLOSED") {
+                        const sParts = data.startDate.split("T");
+                        document.getElementById('startDate').value = sParts[0] || "";
+                        if(sParts[1]) document.getElementById('startTime').value = sParts[1].substring(0, 5);
+
+                        const eParts = data.endDate.split("T");
+                        document.getElementById('endDate').value = eParts[0] || "";
+                        if(eParts[1]) document.getElementById('endTime').value = eParts[1].substring(0, 5);
+                    }
                 }
-            } else {
-                infoSpan.style.display = 'none';
+
+                if(allActiveCards.length > 0) {
+                    updatePeriodDropdown(new Set(allActiveCards.map(c => c.period).filter(Boolean)));
+                }
             }
-            fetchData();
         });
     }
 
-    window.savePeriod = function() {
+    function saveConfig() {
         const pName = document.getElementById('periodName').value;
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-        if(!pName || !start || !end) { alert("차수명과 날짜를 모두 입력해주세요."); return; }
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
         
-        db.collection("settings").doc("appConfig").set({
-            periodName: pName, startDate: start + "T00:00:00", endDate: end + "T23:59:59"
-        }).then(() => { alert(`[${pName}] 신청 기간이 열렸습니다!`); loadPeriod(); }).catch((e) => alert(e));
+        if(!pName || !sDate || !eDate) { alert("차수명과 날짜는 필수 정보입니다."); return; }
+        
+        let sTime = document.getElementById('startTime').value;
+        let eTime = document.getElementById('endTime').value;
+
+        if(!sTime) sTime = "00:00:00";
+        else if(sTime.length === 5) sTime += ":00";
+
+        if(!eTime) eTime = "23:59:59";
+        else if(eTime.length === 5) eTime += ":59";
+
+        const finalStart = `${sDate}T${sTime}`;
+        const finalEnd = `${eDate}T${eTime}`;
+
+        db.collection("settings").doc("appConfig").update({
+            periodName: pName, startDate: finalStart, endDate: finalEnd
+        }).then(() => {
+            alert("명함 신청이 시작되었습니다!");
+            loadConfig();
+        });
     }
 
-    window.cancelPeriod = function() {
-        if(confirm("현재 설정된 신청 기간을 취소하고 접수를 마감하시겠습니까?")) {
-            db.collection("settings").doc("appConfig").set({
-                periodName: "", startDate: "CLOSED", endDate: "CLOSED"
-            }).then(() => { alert("신청 기간이 취소되었습니다."); loadPeriod(); }).catch((e) => alert(e));
+    function closeSystem() {
+        const currentPName = document.getElementById('periodName').value || currentConfigPeriod;
+        
+        if(confirm("정말로 명함 신청을 마감하시겠습니까?")) {
+            db.collection("settings").doc("appConfig").update({
+                periodName: currentPName, 
+                startDate: "CLOSED", 
+                endDate: "CLOSED"
+            }).then(() => {
+                alert("명함 신청이 마감되었습니다.");
+                loadConfig(); 
+            });
         }
     }
 
-    window.toggleTrash = function(e) {
-        const container = document.getElementById('trashContainer');
-        const content = document.getElementById('trashContent');
-        const title = document.getElementById('trashTitle');
-        const icon = document.getElementById('trashToggleIcon');
-
-        if (container.classList.contains('collapsed')) {
-            container.classList.remove('collapsed');
-            content.style.display = 'block';
-            title.style.color = '#c0392b';
-            icon.style.color = '#c0392b';
-            icon.innerText = '▲';
-        } else {
-            container.classList.add('collapsed');
-            content.style.display = 'none';
-            title.style.color = '#888';
-            icon.style.color = '#888';
-            icon.innerText = '▼';
-        }
-    }
-
-    window.fetchData = function() {
-        document.getElementById('loadingMsg').style.display = 'block';
-        
-        db.collection("businessCards").get().then((querySnapshot) => {
-            document.getElementById('loadingMsg').style.display = 'none';
-            allFetchedData = [];
-            trashGroupedData = {};
-            periodMaxTimeMap = {};
-            const periods = new Set();
+    function loadRequestHistory() {
+        db.collection("businessCards").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            allActiveCards = [];
+            allDeletedCards = [];
+            let uniquePeriods = new Set();
+            
             const nowTime = new Date().getTime();
-            const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-
-            const deleteBatch = db.batch();
-            let needDeleteTrigger = false;
-
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                data.docId = doc.id;
-                data.period = (!data.period || data.period.trim() === "") ? "과거 데이터" : data.period;
-                const dataTime = data.timestamp ? data.timestamp.toDate().getTime() : 0;
-
-                if (data.isDeleted === true) {
-                    const deletedTime = data.deletedAt ? data.deletedAt.toDate().getTime() : 0;
-                    if (deletedTime > 0 && (nowTime - deletedTime > thirtyDaysMs)) {
-                        deleteBatch.delete(doc.ref);
-                        needDeleteTrigger = true;
-                        return;
-                    }
-                    if (!trashGroupedData[data.period]) {
-                        trashGroupedData[data.period] = { count: 0, date: data.deletedAt ? data.deletedAt.toDate().toLocaleString('ko-KR') : "알 수 없음" };
-                    }
-                    trashGroupedData[data.period].count++;
-                } else {
-                    periods.add(data.period);
-                    allFetchedData.push(data);
-                    
-                    if (!periodMaxTimeMap[data.period] || dataTime > periodMaxTimeMap[data.period]) {
-                        periodMaxTimeMap[data.period] = dataTime;
+            const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000; 
+            
+            snapshot.forEach((doc) => {
+                let data = doc.data();
+                data.id = doc.id;
+                
+                if (data.isDeleted === true && data.deletedAt) {
+                    const deletedTime = new Date(data.deletedAt).getTime();
+                    if (nowTime - deletedTime > thirtyDaysMs) {
+                        db.collection("businessCards").doc(doc.id).delete().catch(e => console.error(e));
+                        return; 
                     }
                 }
+
+                data.formattedTime = "-";
+                if(data.timestamp) {
+                    const dateObj = data.timestamp.toDate();
+                    data.formattedTime = dateObj.getFullYear() + "-" + 
+                                    String(dateObj.getMonth()+1).padStart(2,'0') + "-" + 
+                                    String(dateObj.getDate()).padStart(2,'0') + " " + 
+                                    String(dateObj.getHours()).padStart(2,'0') + ":" + 
+                                    String(dateObj.getMinutes()).padStart(2,'0');
+                }
+
+                if (data.isDeleted === true) {
+                    allDeletedCards.push(data);
+                } else {
+                    allActiveCards.push(data);
+                    if(data.period) uniquePeriods.add(data.period); 
+                }
             });
-
-            if(needDeleteTrigger) {
-                deleteBatch.commit().then(() => { console.log("만료 데이터 자동 소각 완료."); });
-            }
-
-            let sortedPeriodsArray = Array.from(periods).sort((a, b) => {
-                const timeA = periodMaxTimeMap[a] || 0;
-                const timeB = periodMaxTimeMap[b] || 0;
-                return timeB - timeA;
-            });
-
-            const filterSelect = document.getElementById('periodFilter');
-            const previousSelectedValue = filterSelect.value;
             
-            filterSelect.innerHTML = '<option value="전체">전체 보기</option>';
-            sortedPeriodsArray.forEach(p => { filterSelect.innerHTML += `<option value="${p}">${p}</option>`; });
-
-            if (previousSelectedValue && (periods.has(previousSelectedValue) || previousSelectedValue === "전체")) {
-                filterSelect.value = previousSelectedValue;
-            } else if (sortedPeriodsArray.length > 0) {
-                filterSelect.value = sortedPeriodsArray[0];
-            } else {
-                filterSelect.value = "전체";
-            }
-
-            applyFiltersAndSort();
+            updatePeriodDropdown(uniquePeriods);
+            renderMainTable();
             renderTrashTable();
         });
     }
 
-    window.applyFiltersAndSort = function() {
-        const selectedPeriod = document.getElementById('periodFilter').value;
-        const sortOption = document.getElementById('sortOption').value;
+    function updatePeriodDropdown(periodsSet) {
+        const select = document.getElementById('filterPeriod');
+        let previousValue = select.value; 
+        const isFirstLoad = !initialLoadDone;
 
-        const deleteBtn = document.getElementById('deletePeriodBtn');
-        if (selectedPeriod === "전체") { deleteBtn.style.display = 'none'; } 
-        else { deleteBtn.style.display = 'inline-flex'; }
+        if (currentConfigPeriod && currentConfigPeriod !== "신청 마감") {
+            periodsSet.add(currentConfigPeriod);
+        }
 
-        let displayData = allFetchedData.filter(data => selectedPeriod === "전체" || data.period === selectedPeriod);
+        const periodsArray = Array.from(periodsSet);
+        
+        select.innerHTML = '<option value="ALL">전체 차수 보기</option>';
+        periodsArray.forEach(period => {
+            const option = document.createElement('option');
+            option.value = period;
+            option.innerText = `[${period}] 내역만 보기`;
+            select.appendChild(option);
+        });
 
-        displayData.sort((a, b) => {
-            if (sortOption === "time") {
-                const timeA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
-                const timeB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
-                return timeB - timeA;
-            } 
-            else if (sortOption === "branch") {
-                return (a.branchName || "").localeCompare(b.branchName || "");
-            } 
-            else if (sortOption === "cardType") {
-                const typeWeight = { "일반명함": 1, "스티커명함": 2, "3단명함": 3 };
-                const weightA = typeWeight[a.cardType] || 99;
-                const weightB = typeWeight[b.cardType] || 99;
-                return weightA !== weightB ? weightA - weightB : (a.branchName || "").localeCompare(b.branchName || "");
+        if (isFirstLoad) {
+            if (isSystemActive && currentConfigPeriod) {
+                select.value = currentConfigPeriod; 
+            } else if (allActiveCards.length > 0) {
+                select.value = allActiveCards[0].period; 
+            } else {
+                select.value = "ALL";
             }
-        });
-
-        const tbody = document.getElementById('dataBody');
-        tbody.innerHTML = '';
-        filteredDataForExcel = [];
-
-        displayData.forEach(data => {
-            const dateStr = data.timestamp ? data.timestamp.toDate().toLocaleString('ko-KR') : "";
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td><span style="background:#e9ecef; padding:3px 6px; border-radius:4px; font-size:0.9em;">${data.period}</span></td>
-                            <td>${dateStr}</td><td>${data.cardType}</td><td>${data.branchName}</td>
-                            <td>${data.position}</td><td>${data.userName}</td><td>${data.address}</td>
-                            <td>${data.tel}</td><td>${data.mobile}</td><td>${data.quantity}</td>`;
-            tbody.appendChild(tr);
-
-            filteredDataForExcel.push({
-                "신청 차수": data.period, "신청일시": dateStr, "명함 종류": data.cardType, "본부명": data.branchName,
-                "직책": data.position, "이름": data.userName, "주소": data.address, "TEL": data.tel, "Mobile": data.mobile, "수량": data.quantity
-            });
-        });
-    }
-
-    function getDocsByPeriod(pName) {
-        if (pName === "과거 데이터") {
-            return db.collection("businessCards").get().then(snap => {
-                let docs = [];
-                snap.forEach(doc => {
-                    let d = doc.data();
-                    if (!d.period || d.period.trim() === "" || d.period === "과거 데이터") {
-                        docs.push(doc);
-                    }
-                });
-                return docs;
-            });
+            initialLoadDone = true;
         } else {
-            return db.collection("businessCards").where("period", "==", pName).get().then(snap => {
-                let docs = [];
-                snap.forEach(doc => docs.push(doc));
-                return docs;
-            });
+            if (previousValue === "ALL") select.value = "ALL";
+            else if (periodsArray.includes(previousValue)) select.value = previousValue;
+            else select.value = "ALL";
         }
     }
 
-    window.trashSelectedPeriodData = function() {
-        const selectedPeriod = document.getElementById('periodFilter').value;
-        if(selectedPeriod === "전체") return;
-
-        if(confirm(`[${selectedPeriod}] 차수의 모든 데이터를 휴지통으로 버리시겠습니까?\n버려진 데이터는 휴지통 영역에서 30일간 복구할 수 있습니다.`)) {
-            document.getElementById('loadingMsg').innerText = "휴지통으로 이동 중...";
-            document.getElementById('loadingMsg').style.display = 'block';
-
-            getDocsByPeriod(selectedPeriod).then((docs) => {
-                const batch = db.batch();
-                docs.forEach((doc) => {
-                    batch.update(doc.ref, {
-                        isDeleted: true,
-                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                });
-                return batch.commit();
-            }).then(() => {
-                alert("선택하신 차수가 휴지통으로 이동되었습니다.");
-                document.getElementById('periodFilter').value = "";
-                fetchData();
-            }).catch(e => alert("이동 에러: " + e));
+    function renderMainTable() {
+        const tbody = document.getElementById('rawHistoryList');
+        const filterVal = document.getElementById('filterPeriod').value;
+        tbody.innerHTML = '';
+        
+        let filteredCards = allActiveCards;
+        if(filterVal !== "ALL") {
+            filteredCards = allActiveCards.filter(c => c.period === filterVal);
         }
+        
+        if(filteredCards.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="padding:40px; color:#888;">접수된 신청 내역이 없습니다. (현재 차수: 0건)</td></tr>';
+            document.getElementById('totalCount').innerText = "0";
+            return;
+        }
+        
+        filteredCards.forEach((data, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="col-no">${idx + 1}</td>
+                <td class="col-dim">${data.period || '-'}</td>
+                <td class="col-dim">${data.formattedTime}</td>
+                <td style="font-weight:bold; color:#111;">${data.branchName || '-'}</td>
+                <td>${data.cardType || '-'}</td>
+                <td>${data.position || '-'}</td>
+                <td style="font-weight:bold;">${data.userName || '-'}</td>
+                <td>${data.mobile || '-'}</td>
+                <td style="font-weight:bold; color:#0056b3;">${data.quantity || '0'}</td>
+                <td><button type="button" class="btn-row-delete" onclick="softDeleteRecord('${data.id}', '${data.userName}')">삭제</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        document.getElementById('totalCount').innerText = filteredCards.length;
     }
 
-    function renderTrashTable() {
-        const trashTbody = document.getElementById('trashBody');
-        trashTbody.innerHTML = '';
+    window.renderTrashTable = function() {
+        const trashCountSpan = document.getElementById('trashCount');
+        if(trashCountSpan) trashCountSpan.innerText = allDeletedCards.length;
+        
+        const btn = document.getElementById('toggleTrashBtn');
+        if(btn) btn.innerText = `🗑️ 휴지통 (${allDeletedCards.length})`;
 
-        const trashPeriods = Object.keys(trashGroupedData);
-        if(trashPeriods.length === 0) {
-            trashTbody.innerHTML = '<tr><td colspan="4" style="color:#999; padding:15px;">휴지통이 비어 있습니다.</td></tr>';
+        const batchContainer = document.getElementById('batchTrashListContainer');
+        const indTbody = document.getElementById('individualTrashHistoryList');
+
+        if(allDeletedCards.length === 0) {
+            if(batchContainer) batchContainer.innerHTML = '<div style="padding:15px; color:#999; text-align:center; font-size:13px; background:#fff; border:1px dashed #ccc;">차수별 일괄 삭제된 내역이 없습니다.</div>';
+            if(indTbody) indTbody.innerHTML = '<tr><td colspan="7" style="padding:20px; color:#888;">개별 삭제된 내역이 없습니다.</td></tr>';
             return;
         }
 
-        trashPeriods.forEach(pName => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-weight:bold; color:#c0392b;">${pName}</td>
-                <td>${trashGroupedData[pName].date}</td>
-                <td>${trashGroupedData[pName].count} 건</td>
-                <td>
-                    <button class="btn-trash-action" style="color:blue; font-weight:bold;" onclick="restorePeriod('${pName}')">↩️ 복구</button>
-                    <button class="btn-trash-action" style="color:red;" onclick="permanentlyDeletePeriod('${pName}')">💥 영구삭제</button>
-                </td>
-            `;
-            trashTbody.appendChild(tr);
+        let batchDeleted = allDeletedCards.filter(c => c.deletedType === "batch");
+        let individualDeleted = allDeletedCards.filter(c => c.deletedType !== "batch");
+
+        let batchGroups = {};
+        batchDeleted.forEach(c => {
+            if (!batchGroups[c.period]) { batchGroups[c.period] = []; }
+            batchGroups[c.period].push(c);
         });
-    }
 
-    window.restorePeriod = function(pName) {
-        if(confirm(`[${pName}] 차수 신청 데이터들을 다시 정상 복구하시겠습니까?`)) {
-            getDocsByPeriod(pName).then((docs) => {
-                const batch = db.batch();
-                docs.forEach(doc => {
-                    batch.update(doc.ref, {
-                        isDeleted: firebase.firestore.FieldValue.delete(),
-                        deletedAt: firebase.firestore.FieldValue.delete()
-                    });
-                });
-                return batch.commit();
-            }).then(() => { alert("성공적으로 복구되었습니다."); fetchData(); });
-        }
-    }
-
-    window.permanentlyDeletePeriod = function(pName) {
-        if(confirm(`⚠️ 진짜 최종 경고!\n[${pName}] 차수의 모든 명함 신청 기록이 구글 서버에서 영구히 삭제되어 절대 복구할 수 없습니다. 계속하시겠습니까?`)) {
-            getDocsByPeriod(pName).then((docs) => {
-                const batch = db.batch();
-                docs.forEach(doc => { batch.delete(doc.ref); });
-                return batch.commit();
-            }).then(() => { alert("영구 삭제되었습니다."); fetchData(); });
-        }
-    }
-
-    window.clearTrashEntirely = function() {
-        const trashPeriods = Object.keys(trashGroupedData);
-        if(trashPeriods.length === 0) { alert("비울 휴지통이 없습니다."); return; }
-
-        if(confirm("⚠️ 휴지통 전체 비우기를 실행하시겠습니까?\n현재 휴지통에 담긴 모든 데이터가 영구 삭제되며 복구가 불가능합니다.")) {
-            db.collection("businessCards").where("isDeleted", "==", true).get().then((querySnapshot) => {
-                const batch = db.batch();
-                querySnapshot.forEach(doc => { batch.delete(doc.ref); });
-                return batch.commit();
-            }).then(() => { alert("휴지통을 깨끗하게 비웠습니다."); fetchData(); });
-        }
-    }
-
-    window.downloadExcel = function() {
-        if(filteredDataForExcel.length === 0) { alert("다운로드할 데이터가 없습니다."); return; }
-        const selectedPeriod = document.getElementById('periodFilter').value;
-        const sortText = document.getElementById("sortOption").options[document.getElementById("sortOption").selectedIndex].text;
-        const fileName = selectedPeriod === "전체" ? `전체_명함신청내역(${sortText}).xlsx` : `${selectedPeriod}_명함신청내역(${sortText}).xlsx`;
+        batchContainer.innerHTML = '';
+        const batchPeriods = Object.keys(batchGroups);
         
-        const worksheet = XLSX.utils.json_to_sheet(filteredDataForExcel);
+        if(batchPeriods.length === 0) {
+            batchContainer.innerHTML = '<div style="padding:15px; color:#999; text-align:center; font-size:13px; background:#fff; border:1px dashed #ccc;">차수별 일괄 삭제된 내역이 없습니다.</div>';
+        } else {
+            batchPeriods.forEach((period, idx) => {
+                let list = batchGroups[period];
+                let wrap = document.createElement('div');
+                wrap.style.marginBottom = '8px';
+                
+                // 💡 묶음 우측 상단에 "일괄 복구" 버튼 컴포넌트 추가 바인딩 유도
+                wrap.innerHTML = `
+                    <div style="background: #fff0f1; border: 1px solid #f5c6cb; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; color: #c82333; display: flex; justify-content: space-between; align-items:center;" onclick="let tbl=document.getElementById('batch-trash-table-${idx}'); tbl.style.display = tbl.style.display === 'none' ? 'table' : 'none'">
+                        <span>📦 [${period}] 일괄 삭제 묶음 (총 ${list.length}건 명단 접수됨) ▾</span>
+                        <div onclick="event.stopPropagation();">
+                            <button type="button" class="btn-batch-restore" onclick="restoreSelectedPeriod('${period}')">🔄 현재 차수 일괄 복구</button>
+                        </div>
+                    </div>
+                    <table id="batch-trash-table-${idx}" style="display: none; width:100%; margin-top: 5px; background: #fff; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th class="col-no">No.</th>
+                                <th>본부명</th>
+                                <th>명함 종류</th>
+                                <th>직책</th>
+                                <th>이름</th>
+                                <th>Mobile</th>
+                                <th style="width: 130px;">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batch-trash-tbody-${idx}"></tbody>
+                    </table>
+                `;
+                batchContainer.appendChild(wrap);
+                
+                const tbody = document.getElementById(`batch-trash-tbody-${idx}`);
+                list.forEach((c, cIdx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="col-no">${cIdx + 1}</td>
+                        <td>${c.branchName || '-'}</td>
+                        <td>${c.cardType || '-'}</td>
+                        <td>${c.position || '-'}</td>
+                        <td style="font-weight:bold;">${c.userName || '-'}</td>
+                        <td>${c.mobile || '-'}</td>
+                        <td>
+                            <button type="button" class="btn-row-restore" onclick="restoreRecord('${c.id}', '${c.userName}')">복구</button>
+                            <button type="button" class="btn-row-delete" onclick="hardDeleteRecord('${c.id}', '${c.userName}')">영구삭제</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        indTbody.innerHTML = '';
+        if(individualDeleted.length === 0) {
+            indTbody.innerHTML = '<tr><td colspan="7" style="padding:20px; color:#888;">개별 삭제된 내역이 없습니다.</td></tr>';
+        } else {
+            individualDeleted.forEach((c, cIdx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="col-no">${cIdx + 1}</td>
+                    <td class="col-dim">${c.period || '-'}</td>
+                    <td>${c.branchName || '-'}</td>
+                    <td>${c.cardType || '-'}</td>
+                    <td>${c.position || '-'}</td>
+                    <td style="font-weight:bold;">${c.userName || '-'}</td>
+                    <td>
+                        <button type="button" class="btn-row-restore" onclick="restoreRecord('${c.id}', '${c.userName}')">복구</button>
+                        <button type="button" class="btn-row-delete" onclick="hardDeleteRecord('${c.id}', '${c.userName}')">영구삭제</button>
+                    </td>
+                `;
+                indTbody.appendChild(tr);
+            });
+        }
+    }
+
+    function toggleRecycleBin() {
+        const bin = document.getElementById('recycleBinSection');
+        if(bin.style.display === 'none' || bin.style.display === '') {
+            bin.style.display = 'block';
+        } else {
+            bin.style.display = 'none';
+        }
+        renderTrashTable();
+        setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 100);
+    }
+
+    window.softDeleteRecord = function(docId, userName) {
+        if(confirm(`[${userName}] 님의 명단을 휴지통으로 이동하시겠습니까?`)) {
+            db.collection("businessCards").doc(docId).update({
+                isDeleted: true,
+                deletedType: "individual",
+                deletedAt: new Date().toISOString()
+            }).catch(err => alert("오류가 발생했습니다."));
+        }
+    }
+
+    window.deleteSelectedPeriod = function() {
+        const filterVal = document.getElementById('filterPeriod').value;
+        if(filterVal === "ALL") {
+            alert("삭제할 특정 차수를 드롭다운 목록에서 먼저 선택해 주세요.");
+            return;
+        }
+        
+        const targetCards = allActiveCards.filter(c => c.period === filterVal);
+        if(targetCards.length === 0) { alert("해당 차수에는 삭제할 데이터가 없습니다."); return; }
+
+        if(confirm(`⚠️ 정말로 선택한 [${filterVal}] 차수 명단 전체(${targetCards.length}건)를 휴지통으로 일괄 삭제 이동하시겠습니까?`)) {
+            const batch = db.batch();
+            const nowIso = new Date().toISOString();
+            targetCards.forEach(c => {
+                const ref = db.collection("businessCards").doc(c.id);
+                batch.update(ref, { isDeleted: true, deletedType: "batch", deletedAt: nowIso });
+            });
+            batch.commit().then(() => {
+                alert(`성공적으로 [${filterVal}] 차수의 모든 명단이 휴지통으로 이동되었습니다.`);
+            }).catch(err => alert("일괄 차수 삭제 중 오류가 발생했습니다."));
+        }
+    }
+
+    window.restoreRecord = function(docId, userName) {
+        if(confirm(`[${userName}] 님의 명단을 다시 메인 목록으로 복구하시겠습니까?`)) {
+            db.collection("businessCards").doc(docId).update({
+                isDeleted: firebase.firestore.FieldValue.delete(),
+                deletedType: firebase.firestore.FieldValue.delete(),
+                deletedAt: firebase.firestore.FieldValue.delete()
+            }).then(() => {
+                alert(`[${userName}] 님의 명단이 정상 복구되었습니다.`);
+            }).catch(err => alert("복구 처리 중 오류가 발생했습니다."));
+        }
+    }
+
+    // 💡 새롭게 추가된 기능: 차수 전체 통째로 일괄 복구하는 함수
+    window.restoreSelectedPeriod = function(periodName) {
+        let targetTrashCards = allDeletedCards.filter(c => c.period === periodName && c.deletedType === "batch");
+        if(targetTrashCards.length === 0) { alert("일괄 복구할 데이터가 존재하지 않습니다."); return; }
+
+        if(confirm(`🔄 정말로 휴지통에 있는 [${periodName}] 차수의 명단 전체(${targetTrashCards.length}건)를 한 번에 복구하시겠습니까?`)) {
+            const batch = db.batch();
+            targetTrashCards.forEach(c => {
+                const ref = db.collection("businessCards").doc(c.id);
+                batch.update(ref, {
+                    isDeleted: firebase.firestore.FieldValue.delete(),
+                    deletedType: firebase.firestore.FieldValue.delete(),
+                    deletedAt: firebase.firestore.FieldValue.delete()
+                });
+            });
+            batch.commit().then(() => {
+                alert(`성공적으로 [${periodName}] 차수의 모든 명단이 메인 접수 목록으로 복구되었습니다!`);
+            }).catch(err => alert("일괄 복구 처리 도중 오류가 발생했습니다."));
+        }
+    }
+
+    window.hardDeleteRecord = function(docId, userName) {
+        if(confirm(`⚠️ 정말로 [${userName}] 님의 데이터를 금고에서 영구 파기하시겠습니까?\n이 작업은 절대 되돌릴 수 없습니다!`)) {
+            db.collection("businessCards").doc(docId).delete().then(() => {
+                alert("완전히 삭제되었습니다.");
+            }).catch(err => alert("영구 삭제 도중 오류가 발생했습니다."));
+        }
+    }
+
+    window.emptyRecycleBin = function() {
+        if (allDeletedCards.length === 0) { alert("휴지통이 이미 깨끗하게 비어있습니다."); return; }
+        if (confirm(`⚠️ 경고: 현재 휴지통에 들어있는 총 ${allDeletedCards.length}건의 데이터를 모두 영구 삭제하시겠습니까?\n이 작업은 절대 복구할 수 없습니다.`)) {
+            const batch = db.batch();
+            allDeletedCards.forEach(c => {
+                const ref = db.collection("businessCards").doc(c.id);
+                batch.delete(ref);
+            });
+            batch.commit().then(() => {
+                alert("휴지통 내역이 통째로 전량 영구 파기되었습니다.");
+            }).catch(err => alert("휴지통 비우기 처리 실패."));
+        }
+    }
+
+    function downloadAllToExcel() {
+        const filterVal = document.getElementById('filterPeriod').value;
+        let exportData = allActiveCards;
+        
+        if(filterVal !== "ALL") {
+            exportData = allActiveCards.filter(c => c.period === filterVal);
+        }
+
+        if(exportData.length === 0) { alert("다운로드할 내역이 존재하지 않습니다."); return; }
+        
+        let outExcelArray = exportData.map((c, idx) => {
+            return {
+                "No": idx + 1,
+                "신청차수": c.period || "",
+                "신청일자": c.formattedTime.split(" ")[0],
+                "본부명": c.branchName || "",
+                "명함종류": c.cardType || "",
+                "직책": c.position || "",
+                "이름": c.userName || "",
+                "주소": c.address || "",
+                "TEL": c.tel || "",
+                "Mobile": c.mobile || "",
+                "수량": c.quantity || 0
+            }
+        });
+        
+        const worksheet = XLSX.utils.json_to_sheet(outExcelArray);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "신청내역");
-        XLSX.writeFile(workbook, fileName);
+        
+        const d = new Date();
+        const dateString = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+        
+        const fileNamePrefix = filterVal === "ALL" ? "전체차수" : filterVal.replace(/[/\\?%*:|"<>]/g, '');
+        XLSX.writeFile(workbook, `명함신청내역_${fileNamePrefix}_${dateString}.xlsx`);
     }
 </script>
 </body>
