@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>명함 신청</title>
+    <!-- 💡 엑셀 다운로드를 위한 스크립트 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
@@ -24,13 +26,23 @@
         .autocomplete-items div { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
         .autocomplete-items div:hover { background-color: #f1f1f1; }
         button { width: 100%; padding: 12px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        .btn-add { background-color: #28a745; color: white; margin-top: 10px; }
-        .btn-submit { background-color: #0056b3; color: white; padding: 15px; margin-top: 20px; font-size: 18px; }
+        
+        /* 버튼 색상 및 디자인 명확화 */
+        .btn-add { background-color: #6c757d; color: white; margin-top: 10px; border: 2px dashed #ccc; }
+        .btn-add:hover { background-color: #5a6268; }
+        .btn-submit { background-color: #0056b3; color: white; padding: 15px; margin-top: 20px; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         .btn-submit:hover { background-color: #004494; }
         .btn-delete { background-color: #dc3545; color: white; padding: 5px 10px; font-size: 12px; width: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 20px;}
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-top: 10px;}
         th, td { border: 1px solid #ddd; padding: 10px; }
         th { background-color: #f8f9fa; font-weight: bold; }
+        
+        /* 제출 완료 화면 스타일 */
+        #successSection { display: none; text-align: center; padding: 40px 20px; background-color: #e8f5e9; border: 2px solid #c8e6c9; border-radius: 8px; margin-top: 30px; }
+        .btn-excel { background-color: #217346; color: white; padding: 15px; font-size: 16px; margin-top: 15px; }
+        .btn-excel:hover { background-color: #1e6b40; }
+        .btn-return { background-color: #fff; color: #333; border: 1px solid #ccc; padding: 10px; font-size: 14px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -71,16 +83,26 @@
                 <div class="form-group"><label>Mobile (핸드폰 번호)</label><input type="text" id="mobile" maxlength="13" required></div>
                 <div class="form-group"><label>수량</label><input type="number" id="quantity" min="1" required></div>
             </div>
-            <button type="submit" class="btn-add">↓ 신청자 목록에 추가하기 ↓</button>
+            <button type="submit" class="btn-add">↓ 아래 목록에 임시저장 (추가하기) ↓</button>
         </form>
 
-        <div class="table-container" style="margin-top:30px; border-top:2px solid #333;">
-            <h3 style="margin-top: 20px;">신청자 확인 목록 <span id="listCount" style="color: #0056b3; font-size: 0.8em;">(총 0명)</span></h3>
+        <!-- 명단 리스트 및 최종 제출 영역 -->
+        <div id="tableSection" class="table-container" style="margin-top:40px; border-top:3px solid #333; padding-top:20px;">
+            <h3 style="margin-top: 0;">신청자 확인 목록 <span style="font-size: 0.7em; color: #dc3545;">(현재 컴퓨터에 임시저장 중)</span> <span id="listCount" style="color: #0056b3; font-size: 0.8em; float:right;">총 0명</span></h3>
             <table>
                 <thead><tr><th>명함 종류</th><th>본부명</th><th>직책</th><th>이름</th><th>Mobile</th><th>수량</th><th>관리</th></tr></thead>
                 <tbody id="applicantList"><tr><td colspan="7" style="text-align:center; color:#888;">추가된 신청자가 없습니다.</td></tr></tbody>
             </table>
-            <button type="button" class="btn-submit" id="finalSubmitBtn" style="display: none;">최종 신청 제출하기</button>
+            <button type="button" class="btn-submit" id="finalSubmitBtn" style="display: none;">📤 서버로 최종 신청 제출하기</button>
+        </div>
+
+        <!-- 제출 완료 후 영수증 다운로드 영역 (기본 숨김) -->
+        <div id="successSection">
+            <h2 style="color: #2e7d32; margin-top: 0;">✅ 최종 제출이 완료되었습니다!</h2>
+            <p style="color: #555;">방금 서버로 제출하신 내역을 엑셀 파일로 다운로드하여 보관하실 수 있습니다.</p>
+            <button type="button" class="btn-excel" onclick="downloadReceipt()">📥 신청 내역 다운로드</button>
+            <br>
+            <button type="button" class="btn-return" onclick="resetAll()">돌아가기 (새로운 신청)</button>
         </div>
     </div>
 </div>
@@ -98,13 +120,20 @@
     const db = firebase.firestore();
 
     let currentActivePeriod = "미지정 차수";
+    let applicants = [];
+    let lastSubmittedData = []; // 엑셀 영수증용 보관소
 
     window.onload = function() {
+        // 💡 1. 페이지 접속 시 브라우저에 임시저장된 데이터가 있는지 확인
+        const savedData = localStorage.getItem("tempApplicants");
+        if(savedData) {
+            applicants = JSON.parse(savedData);
+        }
+
         db.collection("settings").doc("appConfig").get().then((doc) => {
             let isOpen = true;
             if (doc.exists) {
                 const data = doc.data();
-                
                 if (data.startDate === "CLOSED" || data.endDate === "CLOSED" || !data.startDate || !data.endDate) {
                     isOpen = false;
                     document.getElementById('periodText').innerHTML = `현재 열려있는 정기 명함 신청 기간이 아닙니다.`;
@@ -120,16 +149,14 @@
                         document.getElementById('periodText').innerHTML = `신청 기간: <strong>${data.startDate.split('T')[0]} ~ ${data.endDate.split('T')[0]}</strong>`;
                     }
                 }
-            } else {
-                isOpen = false;
-                document.getElementById('periodText').innerHTML = `현재 열려있는 정기 명함 신청 기간이 아닙니다.`;
-            }
+            } else { isOpen = false; }
             
-            if (isOpen) { document.getElementById('mainContent').style.display = 'block'; } 
+            if (isOpen) { 
+                document.getElementById('mainContent').style.display = 'block'; 
+                renderTable(); // 열려있을 때만 표를 그림 (임시저장 복구 포함)
+            } 
             else { document.getElementById('closedMessage').style.display = 'block'; }
-        }).catch(() => {
-            document.getElementById('closedMessage').style.display = 'block';
-        });
+        }).catch(() => { document.getElementById('closedMessage').style.display = 'block'; });
     };
 
     const branchData = {
@@ -176,7 +203,6 @@
         "평택/안성영업본부": { "address": "경기도 평택시 서재4길 26-1, 1층", "tel": "031-654-1540" }
     };
 
-    let applicants = [];
     const branchInput = document.getElementById('branchName');
     const autocompleteList = document.getElementById('autocomplete-list');
 
@@ -188,7 +214,6 @@
                 hasItem = true;
                 let item = document.createElement('div');
                 item.innerHTML = filterText ? branch.replace(new RegExp(`(${filterText})`, 'gi'), "<strong>$1</strong>") : branch;
-                
                 item.addEventListener('click', function() {
                     branchInput.value = branch;
                     autocompleteList.style.display = 'none';
@@ -201,14 +226,8 @@
         autocompleteList.style.display = hasItem ? 'block' : 'none';
     }
 
-    branchInput.addEventListener('input', function() {
-        renderAutocomplete(this.value);
-    });
-
-    branchInput.addEventListener('focus', function() {
-        renderAutocomplete(this.value);
-    });
-
+    branchInput.addEventListener('input', function() { renderAutocomplete(this.value); });
+    branchInput.addEventListener('focus', function() { renderAutocomplete(this.value); });
     document.addEventListener('click', e => { if (e.target !== branchInput) autocompleteList.style.display = 'none'; });
 
     document.getElementById('mobile').addEventListener('input', function(e) {
@@ -218,18 +237,36 @@
         else this.value = val;
     });
 
+    // 데이터를 브라우저에 임시저장하는 헬퍼 함수
+    function saveToLocalStorage() {
+        localStorage.setItem("tempApplicants", JSON.stringify(applicants));
+    }
+
+    // 💡 2. 중복 경고 & 목록 추가
     document.getElementById('inputForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const bName = branchInput.value;
+        const inputUserName = document.getElementById('userName').value;
         if(!branchData[bName]) { alert("목록에 있는 정확한 본부명을 선택해주세요."); return; }
+
+        // 똑같은 이름이 있는지 검사
+        const isDuplicate = applicants.some(app => app.userName === inputUserName);
+        if(isDuplicate) {
+            if(!confirm(`⚠️ 이미 목록에 [${inputUserName}] 님의 이름이 있습니다.\n명함 종류가 다를 경우 계속 진행해 주세요.\n\n정말로 추가하시겠습니까?`)) {
+                return; // 취소하면 여기서 멈춤
+            }
+        }
 
         applicants.push({
             branchName: bName, cardType: document.getElementById('cardType').value,
             address: document.getElementById('address').value, tel: document.getElementById('tel').value,
-            position: document.getElementById('position').value, userName: document.getElementById('userName').value,
+            position: document.getElementById('position').value, userName: inputUserName,
             mobile: document.getElementById('mobile').value, quantity: document.getElementById('quantity').value
         });
+        
+        saveToLocalStorage(); // 추가할 때마다 자동 저장
         renderTable();
+        
         ['cardType','position','userName','mobile','quantity'].forEach(id => document.getElementById(id).value = '');
     });
 
@@ -247,16 +284,21 @@
             });
             document.getElementById('finalSubmitBtn').style.display = 'block';
         }
-        document.getElementById('listCount').innerText = `(총 ${applicants.length}명)`;
+        document.getElementById('listCount').innerText = `총 ${applicants.length}명`;
     }
 
-    window.deleteRow = function(index) { applicants.splice(index, 1); renderTable(); };
+    window.deleteRow = function(index) { 
+        applicants.splice(index, 1); 
+        saveToLocalStorage(); // 삭제할 때도 자동 저장
+        renderTable(); 
+    };
 
+    // 💡 3. 최종 제출 및 엑셀 다운로드 전환
     document.getElementById('finalSubmitBtn').addEventListener('click', async function() {
         if(applicants.length === 0) return;
-        if(confirm(`총 ${applicants.length}명의 명함을 신청하시겠습니까?`)) {
+        if(confirm(`위 목록에 있는 총 ${applicants.length}명의 명함을 최종 제출하시겠습니까?\n제출 후에는 수정할 수 없습니다.`)) {
             const btn = document.getElementById('finalSubmitBtn');
-            btn.innerText = '데이터 전송 중...'; btn.disabled = true;
+            btn.innerText = '서버로 데이터 전송 중...'; btn.disabled = true;
             try {
                 for (let app of applicants) {
                     await db.collection("businessCards").add({
@@ -265,12 +307,60 @@
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
-                alert('성공적으로 제출되었습니다!');
-                applicants = []; renderTable();
-            } catch (error) { alert("오류가 발생했습니다."); } 
-            finally { btn.innerText = '최종 신청 제출하기'; btn.disabled = false; }
+                // 제출 성공 시 처리
+                lastSubmittedData = [...applicants]; // 엑셀용 보관
+                applicants = []; // 목록 비우기
+                localStorage.removeItem("tempApplicants"); // 브라우저 임시저장 비우기
+                renderTable(); // 빈 목록으로 다시 그림
+                
+                // 제출 폼 숨기고 완료 화면 띄우기
+                document.getElementById('tableSection').style.display = 'none';
+                document.getElementById('inputForm').style.display = 'none';
+                document.getElementById('successSection').style.display = 'block';
+
+            } catch (error) { 
+                alert("오류가 발생했습니다. 잠시 후 다시 시도해주세요."); 
+            } finally { 
+                btn.innerText = '📤 서버로 최종 신청 제출하기'; btn.disabled = false; 
+            }
         }
     });
+
+    // 엑셀 다운로드 함수
+    window.downloadReceipt = function() {
+        if(lastSubmittedData.length === 0) { alert("다운로드할 데이터가 없습니다."); return; }
+        
+        let excelData = lastSubmittedData.map(data => ({
+            "신청 차수": currentActivePeriod,
+            "명함 종류": data.cardType,
+            "본부명": data.branchName,
+            "직책": data.position,
+            "이름": data.userName,
+            "주소": data.address,
+            "TEL": data.tel,
+            "Mobile": data.mobile,
+            "수량": data.quantity
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "신청내역");
+        
+        const today = new Date();
+        const dateStr = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
+        
+        XLSX.writeFile(workbook, `명함신청내역_${dateStr}.xlsx`);
+    }
+
+    // 새로고침 (돌아가기) 버튼
+    window.resetAll = function() {
+        document.getElementById('successSection').style.display = 'none';
+        document.getElementById('tableSection').style.display = 'block';
+        document.getElementById('inputForm').style.display = 'block';
+        document.getElementById('branchName').value = '';
+        document.getElementById('address').value = '';
+        document.getElementById('tel').value = '';
+    }
 </script>
 </body>
 </html>
